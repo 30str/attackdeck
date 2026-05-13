@@ -1,0 +1,73 @@
+{
+  "gh-cragheart": {
+    "p09": "Ignorer les effets négatifs des objets",
+    "p10": "Ignorer les effets négatifs des scénarios"
+  },
+  "gh-mindthief": {
+    "p12": "Ignorer les effets négatifs des scénarios"
+  },
+  "gh-scoundrel": {
+    "p11": "Ignorer les effets négatifs des scénarios"
+  },
+  "gh-tinkerer": {
+    "p11": "Ignorer les effets négatifs des scénarios"
+  },
+  "gh-beast-tyrant": {
+    "p08": "Ignorer les effets négatifs des scénarios"
+  },
+  "gh-berserker": {
+    "p10": "Ignorer les effets négatifs des objets"
+  },
+  "gh-doomstalker": {
+    "p10": "Ignorer les effets négatifs des scénarios"
+  },
+  "gh-sunkeeper": {
+    "p11": "Ignorer les effets négatifs des scénarios"
+  },
+  "fh-banner-spear": {
+    "p08": "À la fin de chacun de vos repos long octroyer à un allié à Portée 3 ou moins : Déplacement 2",
+    "p10": "Une fois par scénario, pendant votre tour, gagner Bouclier 2 pour le round"
+  },
+  "fh-blinkblade": {
+    "p10": "À chaque scénario, au début de votre premier tour, pouvoir effectuer : Déplacement 3",
+    "p11": "Lorsque vous devriez gagner Immobilisation, bloquer cet état"
+  },
+  "fh-boneshaper": {
+    "p08": "Juste avant chacun de vos repos, pouvoir éliminer une de vos invocations pour effectuer Bénédiction, sur vous-même",
+    "p10": "Au début de chaque scénario, pouvoir jouer une carte de niveau 1 de votre main pour effectuer une de ses actions d'invocation"
+  },
+  "fh-deathwalker": {
+    "p08": "Ignorer les effets de scénario"
+  },
+  "fh-drifter": {
+    "p11": "Lors de vos repos longs, pouvoir reculer un de vos pions Aventurier d'un emplacement",
+    "p13": "À la fin de chaque scénario, pouvoir défausser jusqu'à deux cartes Butin, excepté Objet Aléatoire, pour piocher autant de nouvelles cartes Butin"
+  },
+  "fh-geminate": {
+    "p09": "Ignorer les effets de scénario",
+    "p10": "Lorsque vous prenez un repos court, pouvoir retirer un état négatif d'un allié à Portée 3 ou moins",
+    "p11": "Une fois par scénario, quand vous devriez vous donner un état négatif, bloquer cet état",
+    "p12": "Lorsque vous effectuez une action avec une icône « Perdue », pouvoir défausser une carte pour Récupérer une carte de niveau inférieur ou égal de votre défausse"
+  },
+  "fh-infuser": {
+    "p08": "Ignorer les effets de scénario"
+  },
+  "fh-pyroclast": {
+    "p09": "Ignorer les effets de scénario"
+  },
+  "fh-shattersong": {
+    "p08": "Ignorer les effets de scénario"
+  },
+  "fh-snowdancer": {
+    "p09": "Au début de chaque scénario, tous les adversaires gagnent Confusion. Lorsque qu'une nouvelle salle est révélée, tous les adversaires qui s'y trouvent gagnent Confusion"
+  },
+  "fh-trapper": {
+    "p07": "Ignorer les effets de scénario"
+  },
+  "ccug-frostborn": {
+    "p11": "Ignorer les effets de scénario"
+  },
+  "ccug-rootwhisperer": {
+    "p09": "Ignorer les effets de scénario"
+  }
+}

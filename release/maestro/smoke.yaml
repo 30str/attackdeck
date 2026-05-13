@@ -1,0 +1,47 @@
+# Maestro smoke flow for Attack Deck.
+#
+# Install Maestro: https://maestro.mobile.dev/getting-started/installing-maestro
+# (macOS/Linux: curl -Ls "https://get.maestro.mobile.dev" | bash)
+# Run a dev build on a connected device/simulator, then from the repo root:
+#   maestro test release/maestro/smoke.yaml
+#
+# This is intentionally narrow — it proves the golden path still works
+# (add character → toggle a perk → draw a card). Anything broken in those
+# steps surfaces immediately.
+
+appId: com.30str.attackdeck  # iOS bundle ID; Android: com.thirtystr.attackdeck
+---
+- launchApp:
+    clearState: true
+
+# Party screen — add a character
+- assertVisible: "No characters yet"
+- tapOn: "Add character"
+- inputText: "Smoke"
+- tapOn: "Brute"
+- tapOn:
+    text: "Add"
+    index: 0
+
+# Character screen — toggle a perk
+- assertVisible: "Smoke"
+- assertVisible: "Brute"
+- tapOn:
+    text: "+"
+    index: 0
+- assertVisible: "1 / 1"
+
+# Open draw screen and draw three times
+- tapOn: "Open draw screen"
+- tapOn:
+    id: "DRAW"
+    text: "DRAW"
+- waitForAnimationToEnd
+- tapOn: "DRAW"
+- waitForAnimationToEnd
+- tapOn: "DRAW"
+- waitForAnimationToEnd
+
+# Discard should now have 3 cards (modulo a rolling sequence pulling more)
+- assertVisible:
+    text: "discard"

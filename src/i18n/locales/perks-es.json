@@ -1,0 +1,98 @@
+{
+  "gh-cragheart": {
+    "p09": "Ignora los efectos negativos de los objetos",
+    "p10": "Ignora los efectos negativos del Escenario"
+  },
+  "gh-mindthief": {
+    "p12": "Ignora los efectos negativos del Escenario"
+  },
+  "gh-scoundrel": {
+    "p11": "Ignora los efectos negativos del Escenario"
+  },
+  "gh-tinkerer": {
+    "p11": "Ignora los efectos negativos del Escenario"
+  },
+  "gh-beast-tyrant": {
+    "p08": "Ignora los efectos negativos del Escenario"
+  },
+  "gh-berserker": {
+    "p10": "Ignora los efectos negativos de los objetos"
+  },
+  "gh-doomstalker": {
+    "p10": "Ignora los efectos negativos del Escenario"
+  },
+  "gh-sunkeeper": {
+    "p11": "Ignora los efectos negativos del Escenario"
+  },
+  "fh-banner-spear": {
+    "p08": "Al final de cada uno de tus descansos largos, otorga a un aliado a Alcance 3 o menos: Movimiento 2",
+    "p09": "Siempre que abras una puerta con una capacidad de Movimiento, añade Movimiento +3",
+    "p10": "Una vez por escenario, durante tu turno, obtén Escudo 2 durante la ronda en curso"
+  },
+  "fh-blinkblade": {
+    "p10": "Al comienzo de tu primer turno de cada escenario, puedes realizar Movimiento 3",
+    "p11": "Siempre que vayas a obtener Inmovilización, evítalo"
+  },
+  "fh-boneshaper": {
+    "p08": "Justo antes de cada uno de tus descansos, puedes matar a 1 de tus invocaciones para realizar Bendición, Personal",
+    "p10": "Al comienzo de cada escenario, puedes jugar 1 carta de nivel 1 de tu mano para realizar 1 acción de invocación de la carta"
+  },
+  "fh-deathwalker": {
+    "p08": "Ignora efectos de Escenario"
+  },
+  "fh-drifter": {
+    "p11": "Cada vez que realices un descanso largo, puedes mover 1 de tus fichas de Personaje 1 espacio hacia atrás",
+    "p13": "Al final de cada escenario, puedes descartar hasta 2 cartas de Botín, excepto la de Objeto aleatorio, para robar ese mismo número de cartas de Botín nuevas"
+  },
+  "fh-geminate": {
+    "p09": "Ignora efectos de Escenario",
+    "p10": "Siempre que realices un descanso corto, puedes retirar 1 estado negativo de un aliado a Alcance 3 o menos",
+    "p11": "Una vez por escenario, cuando te vayas a aplicar a ti un estado negativo, evítalo",
+    "p12": "Siempre que realices una acción con un símbolo de perder, puedes descartar 1 carta para Recuperar 1 carta de tu pila de descartes de nivel igual o inferior"
+  },
+  "fh-crashing-tide": {
+    "p09": "Siempre que declares un descanso largo durante la selección de cartas, obtén Escudo 1 durante esa ronda",
+    "p10": "Obtén Ventaja en todos tus ataques realizados mientras ocupes hexágonos de agua o elijas como objetivos a enemigos que ocupen hexágonos de agua"
+  },
+  "fh-deepwraith": {
+    "p12": "Mientras tengas Invisibilidad, obtienes Ventaja en todos tus ataques"
+  },
+  "fh-hive": {
+    "p08": "Siempre que realices un descanso largo, puedes hacerlo con cualquier valor de iniciativa, que eliges después de que se haya revelado todas las cartas de Capacidad, y tú decides cómo realizan sus capacidades tus invocaciones durante la ronda",
+    "p10": "Siempre que vayas a sufrir Herida, evítalo"
+  },
+  "fh-infuser": {
+    "p08": "Ignora efectos de Escenario",
+    "p11": "Una vez por escenario, al determinar la iniciativa, después de que se hayan revelado todas las cartas de Capacidad, Salvaje"
+  },
+  "fh-metal-mosaic": {
+    "p10": "Una vez por escenario, cuando este personaje vaya a quedar agotado, en su lugar obtienes Aturdimiento y Invisibilidad, pierdes todas tus cartas, Recuperar 4 cartas perdidas y luego descarta las cartas recuperadas"
+  },
+  "fh-pain-conduit": {
+    "p10": "Cada ronda en la que realices un descanso largo, puedes ignorar todos los estados negativos que tengas; si lo haces no se podrán retirar durante esa ronda",
+    "p11": "Siempre que este personaje quede agotado, realiza primero Maldición, Objetivo todos, Alcance 3",
+    "p12": "Aumenta tu valor máximo de puntos de vida en 5"
+  },
+  "fh-pyroclast": {
+    "p09": "Ignora efectos de Escenario",
+    "p10": "Siempre que realices un descanso largo, puedes destruir un obstáculo adyacente para obtener Protegido",
+    "p12": "A ti y a todos los aliados no os afecta el terreno peligroso que tú creas"
+  },
+  "fh-shattersong": {
+    "p08": "Ignora efectos de Escenario",
+    "p11": "Cada vez que se revele una nueva sala, puedes revelar la primera carta del mazo de Modificadores de ataque de monstruo y de todos los mazos de Modificadores de ataque de los aliados"
+  },
+  "fh-snowdancer": {
+    "p09": "Al comienzo de cada escenario, todos los enemigos sufren Confusión; cada vez que se revele una nueva sala, todos los enemigos de la nueva sala sufren Confusión"
+  },
+  "fh-trapper": {
+    "p07": "Ignora efectos de Escenario",
+    "p09": "Siempre que entres en un hexágono con una trampa, puedes elegir no activarla"
+  },
+  "ccug-frostborn": {
+    "p11": "Ignora efectos de Escenario"
+  },
+  "ccug-rootwhisperer": {
+    "p09": "Ignora efectos de Escenario"
+  }
+}

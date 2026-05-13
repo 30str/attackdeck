@@ -1,0 +1,74 @@
+{
+  "gh-cragheart": {
+    "p09": "negative Zustände von Gegenständen ignorieren",
+    "p10": "negative Szenario Zustände ignorieren"
+  },
+  "gh-mindthief": {
+    "p12": "negative Szenario Zustände ignorieren"
+  },
+  "gh-scoundrel": {
+    "p11": "negative Szenario Zustände ignorieren"
+  },
+  "gh-tinkerer": {
+    "p11": "negative Szenario Zustände ignorieren"
+  },
+  "gh-beast-tyrant": {
+    "p08": "negative Szenario Zustände ignorieren"
+  },
+  "gh-berserker": {
+    "p10": "negative Zustände von Gegenständen ignorieren"
+  },
+  "gh-doomstalker": {
+    "p10": "negative Szenario Zustände ignorieren"
+  },
+  "gh-sunkeeper": {
+    "p11": "negative Szenario Zustände ignorieren"
+  },
+  "fh-banner-spear": {
+    "p08": "Gewähre am Ende deiner langen Rast einem Verbündeten in Reichweite 3: Bewegung 2",
+    "p10": "Erhalte einmal pro Szenario während deines Zugs Schild 2 für die Runde"
+  },
+  "fh-blinkblade": {
+    "p10": "In jedem Szenario kannst du zu Beginn deines ersten Zugs Bewegung 3 ausführen",
+    "p11": "Wann immer du Lähmung erhalten würdest, wird der Zustand verhindert"
+  },
+  "fh-boneshaper": {
+    "p08": "Bevor du rastest kannst du einen deiner Beschworenen töten, um Segen Selbst auszuführen",
+    "p10": "Zu Beginn jedes Szenarios kannst du eine Stufe-1-Karte von deiner Hand spielen, um eine Beschwörungsaktion der Karte auszuführen"
+  },
+  "fh-deathwalker": {
+    "p08": "Ignoriere Szenarioeffekte"
+  },
+  "fh-drifter": {
+    "p11": "Bei deiner langen Rast kannst du einen deiner Charaktermarker um ein Feld zurückbewegen",
+    "p13": "Am Ende jedes Szenarios kannst du bis zu 2 Beutekarten außer „Zufälliger Gegenstand“ abwerfen, um ebenso viele neue Beutekarten zu ziehen"
+  },
+  "fh-geminate": {
+    "p09": "Ignoriere Szenarioeffekte",
+    "p10": "Bei deiner kurzen Rast darfst du 1 negativen Zustand von 1 Verbündeten in Reichweite 3 entfernen",
+    "p11": "Wenn du dir einen negativen Zustand geben würdest, wende ihn einmal pro Szenario nicht an",
+    "p12": "Wann immer du eine Aktion mit Verloren-Symbol ausführst, kannst du 1 Karte abwerfen, um 1 Karte höchstens gleicher Stufe von deinem Abwurfstapel Zurückbekommen"
+  },
+  "fh-hive": {
+    "p08": "Du kannst deinen Initiative-Wert bei deiner langen Rast nach Aufdecken aller Fertigkeitskarten selbst bestimmen und entscheiden, wie deine Beschworenen ihre Fertigkeiten in dieser Runde ausführen",
+    "p10": "Wann immer du Wunde erhalten würdest, wird der Zustand verhindert"
+  },
+  "fh-infuser": {
+    "p08": "Ignoriere Szenarioeffekte"
+  },
+  "fh-pyroclast": {
+    "p09": "Ignoriere Szenarioeffekte"
+  },
+  "fh-shattersong": {
+    "p08": "Ignoriere Szenarioeffekte"
+  },
+  "fh-trapper": {
+    "p07": "Ignoriere Szenarioeffekte"
+  },
+  "ccug-frostborn": {
+    "p11": "Ignoriere Szenarioeffekte"
+  },
+  "ccug-rootwhisperer": {
+    "p09": "Ignoriere Szenarioeffekte"
+  }
+}

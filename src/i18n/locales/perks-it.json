@@ -1,0 +1,51 @@
+{
+  "gh-cragheart": {
+    "p09": "Ignora gli effetti negativi degli oggetti",
+    "p10": "Ignora gli effetti negativi dello scenario"
+  },
+  "gh-mindthief": {
+    "p12": "Ignora gli effetti negativi dello scenario"
+  },
+  "gh-scoundrel": {
+    "p11": "Ignora gli effetti negativi dello scenario"
+  },
+  "gh-tinkerer": {
+    "p11": "Ignora gli effetti negativi dello scenario"
+  },
+  "gh-beast-tyrant": {
+    "p08": "Ignora gli effetti negativi dello scenario"
+  },
+  "gh-berserker": {
+    "p10": "Ignora gli effetti negativi degli oggetti"
+  },
+  "gh-doomstalker": {
+    "p10": "Ignora gli effetti negativi dello scenario"
+  },
+  "gh-sunkeeper": {
+    "p11": "Ignora gli effetti negativi dello scenario"
+  },
+  "fh-deathwalker": {
+    "p08": "Ignora gli effetti dello scenario"
+  },
+  "fh-geminate": {
+    "p09": "Ignora gli effetti dello scenario"
+  },
+  "fh-infuser": {
+    "p08": "Ignora gli effetti dello scenario"
+  },
+  "fh-pyroclast": {
+    "p09": "Ignora gli effetti dello scenario"
+  },
+  "fh-shattersong": {
+    "p08": "Ignora gli effetti dello scenario"
+  },
+  "fh-trapper": {
+    "p07": "Ignora gli effetti dello scenario"
+  },
+  "ccug-frostborn": {
+    "p11": "Ignora gli effetti dello scenario"
+  },
+  "ccug-rootwhisperer": {
+    "p09": "Ignora gli effetti dello scenario"
+  }
+}
