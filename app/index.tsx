@@ -17,8 +17,10 @@ export default function PartyScreen() {
   const unlock = useSettings((s) => s.unlock);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [step, setStep] = useState<"class" | "name">("class");
   const [name, setName] = useState("");
-  const [classId, setClassId] = useState<string>(CLASSES[0]?.id ?? "");
+  const [classId, setClassId] = useState<string>("");
+  const [query, setQuery] = useState("");
   const [pendingUnlock, setPendingUnlock] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -30,19 +32,31 @@ export default function PartyScreen() {
     return !isUnlockable(k) || unlockedClasses.includes(id);
   };
 
+  const openAddModal = () => {
+    setStep("class");
+    setName("");
+    setClassId("");
+    setQuery("");
+    setPendingUnlock(null);
+    setAddOpen(true);
+  };
+
   const handleClassPress = (k: typeof CLASSES[number]) => {
     if (!isUnlockable(k)) {
       setClassId(k.id);
+      setStep("name");
       return;
     }
     if (unlockedClasses.includes(k.id)) {
       setClassId(k.id);
+      setStep("name");
       return;
     }
     if (pendingUnlock === k.id) {
       unlock(k.id);
       setPendingUnlock(null);
       setClassId(k.id);
+      setStep("name");
     } else {
       setPendingUnlock(k.id);
     }
@@ -54,15 +68,26 @@ export default function PartyScreen() {
     if (!klass) return;
     const finalName = name.trim() || klass.name;
     addCharacter(finalName, classId);
-    setName("");
     setAddOpen(false);
+    setStep("class");
+    setName("");
+    setClassId("");
+    setQuery("");
     setPendingUnlock(null);
   };
 
   const handleCloseModal = () => {
     setAddOpen(false);
+    setStep("class");
     setPendingUnlock(null);
   };
+
+  const handleBackToClass = () => {
+    setStep("class");
+    setName("");
+  };
+
+  const chosenClass = step === "name" ? findClass(classId) : null;
 
   const handleRowPress = (id: string) => {
     if (pendingDeleteId) {
@@ -146,7 +171,7 @@ export default function PartyScreen() {
             dismissPendingDelete();
             return;
           }
-          setAddOpen(true);
+          openAddModal();
         }}
       >
         <Text style={styles.fabTxt}>{t("party.addBtn")}</Text>
@@ -159,91 +184,140 @@ export default function PartyScreen() {
         >
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>{t("party.newCharacter")}</Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder={t("party.namePlaceholder")}
-              placeholderTextColor="#666"
-              style={styles.input}
-              autoFocus
-            />
-            <Text style={styles.modalLabel}>{t("party.classLabel")}</Text>
-            <ScrollView style={styles.classList} contentContainerStyle={{ gap: 6 }}>
-              {(() => {
-                const firstFanId = GAMES.find((g) => g.category === "fan")?.id;
-                return GAMES.map((g) => {
-                  const classesForGame = CLASSES.filter((c) => c.game === g.id);
-                  if (classesForGame.length === 0) return null;
-                  const starters = classesForGame.filter((c) => !isUnlockable(c));
-                  const lockable = classesForGame.filter((c) => isUnlockable(c));
-                  const showFanDivider = g.id === firstFanId;
-                  return (
-                    <View key={g.id} style={{ gap: 6 }}>
-                      {showFanDivider ? (
-                        <Text style={styles.categoryHeader}>
-                          {t("party.fanExpansionsHeader")}
-                        </Text>
-                      ) : null}
-                      <Text style={styles.gameHeader}>{t(`games.${g.id}`)}</Text>
-                    {starters.map((c) => (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => handleClassPress(c)}
-                        style={[styles.classRow, classId === c.id && styles.classRowSel]}
-                      >
-                        <ClassIcon klass={c} size={32} />
-                        <Text style={styles.classRowTxt}>{c.name}</Text>
-                      </Pressable>
-                    ))}
-                    {lockable.length > 0 ? (
-                      <Text style={styles.subHeader}>{t("party.unlockableHeader")}</Text>
-                    ) : null}
-                    {lockable.map((c) => {
-                      const unlocked = unlockedClasses.includes(c.id);
-                      const pending = pendingUnlock === c.id;
-                      const selected = classId === c.id && unlocked;
+            {step === "class" ? (
+              <>
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={t("party.searchClasses")}
+                  placeholderTextColor="#666"
+                  style={styles.input}
+                  autoFocus
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                <ScrollView
+                  style={styles.classList}
+                  contentContainerStyle={{ gap: 6 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {(() => {
+                    const firstFanId = GAMES.find((g) => g.category === "fan")?.id;
+                    const q = query.trim().toLowerCase();
+                    const matches = (c: typeof CLASSES[number]) => {
+                      if (!q) return true;
+                      const unlocked = !isUnlockable(c) || unlockedClasses.includes(c.id);
+                      const haystack = unlocked ? c.name : c.codeName ?? c.name;
+                      return haystack.toLowerCase().includes(q);
+                    };
+                    const visibleGames = GAMES.filter((g) =>
+                      CLASSES.some((c) => c.game === g.id && matches(c))
+                    );
+                    if (visibleGames.length === 0) {
                       return (
-                        <Pressable
-                          key={c.id}
-                          onPress={() => handleClassPress(c)}
-                          style={[
-                            styles.classRow,
-                            !unlocked && styles.classRowLocked,
-                            pending && styles.classRowPending,
-                            selected && styles.classRowSel,
-                          ]}
-                        >
-                          <ClassIcon klass={c} locked={!unlocked} size={32} />
-                          {unlocked ? (
-                            <Text style={styles.classRowTxt}>{c.name}</Text>
-                          ) : pending ? (
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.classRowTxt}>{c.codeName}</Text>
-                              <Text style={styles.unlockHint}>{t("party.tapAgainToReveal")}</Text>
-                            </View>
-                          ) : (
-                            <Text style={styles.classRowLockedTxt}>{c.codeName}</Text>
-                          )}
-                        </Pressable>
+                        <Text style={styles.emptySearch}>{t("party.noMatches")}</Text>
                       );
-                    })}
+                    }
+                    return visibleGames.map((g) => {
+                      const classesForGame = CLASSES.filter((c) => c.game === g.id && matches(c));
+                      const starters = classesForGame.filter((c) => !isUnlockable(c));
+                      const lockable = classesForGame.filter((c) => isUnlockable(c));
+                      const showFanDivider = g.id === firstFanId;
+                      return (
+                        <View key={g.id} style={{ gap: 6 }}>
+                          {showFanDivider ? (
+                            <Text style={styles.categoryHeader}>
+                              {t("party.fanExpansionsHeader")}
+                            </Text>
+                          ) : null}
+                          <Text style={styles.gameHeader}>{t(`games.${g.id}`)}</Text>
+                          {starters.map((c) => (
+                            <Pressable
+                              key={c.id}
+                              onPress={() => handleClassPress(c)}
+                              style={styles.classRow}
+                            >
+                              <ClassIcon klass={c} size={32} />
+                              <Text style={styles.classRowTxt}>{c.name}</Text>
+                            </Pressable>
+                          ))}
+                          {lockable.length > 0 ? (
+                            <Text style={styles.subHeader}>{t("party.unlockableHeader")}</Text>
+                          ) : null}
+                          {lockable.map((c) => {
+                            const unlocked = unlockedClasses.includes(c.id);
+                            const pending = pendingUnlock === c.id;
+                            return (
+                              <Pressable
+                                key={c.id}
+                                onPress={() => handleClassPress(c)}
+                                style={[
+                                  styles.classRow,
+                                  !unlocked && styles.classRowLocked,
+                                  pending && styles.classRowPending,
+                                ]}
+                              >
+                                <ClassIcon klass={c} locked={!unlocked} size={32} />
+                                {unlocked ? (
+                                  <Text style={styles.classRowTxt}>{c.name}</Text>
+                                ) : pending ? (
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.classRowTxt}>{c.codeName}</Text>
+                                    <Text style={styles.unlockHint}>{t("party.tapAgainToReveal")}</Text>
+                                  </View>
+                                ) : (
+                                  <Text style={styles.classRowLockedTxt}>{c.codeName}</Text>
+                                )}
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      );
+                    });
+                  })()}
+                </ScrollView>
+                <View style={styles.modalActions}>
+                  <Pressable style={styles.btnGhost} onPress={handleCloseModal}>
+                    <Text style={styles.btnGhostTxt}>{t("common.cancel")}</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                {chosenClass ? (
+                  <View style={styles.chosenRow}>
+                    <ClassIcon klass={chosenClass} size={36} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.chosenName}>{chosenClass.name}</Text>
+                      <Text style={styles.chosenGame}>{t(`games.${chosenClass.game}`)}</Text>
+                    </View>
                   </View>
-                );
-                });
-              })()}
-            </ScrollView>
-            <View style={styles.modalActions}>
-              <Pressable style={styles.btnGhost} onPress={handleCloseModal}>
-                <Text style={styles.btnGhostTxt}>{t("common.cancel")}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.btn, !isAvailable(classId) && styles.btnDisabled]}
-                onPress={handleAdd}
-                disabled={!isAvailable(classId)}
-              >
-                <Text style={styles.btnTxt}>{t("common.add")}</Text>
-              </Pressable>
-            </View>
+                ) : null}
+                <Text style={styles.modalLabel}>{t("party.nameLabel")}</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={chosenClass?.name ?? t("party.namePlaceholder")}
+                  placeholderTextColor="#666"
+                  style={styles.input}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleAdd}
+                />
+                <View style={styles.modalActions}>
+                  <Pressable style={styles.btnGhost} onPress={handleBackToClass}>
+                    <Text style={styles.btnGhostTxt}>{t("common.back")}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.btn, !isAvailable(classId) && styles.btnDisabled]}
+                    onPress={handleAdd}
+                    disabled={!isAvailable(classId)}
+                  >
+                    <Text style={styles.btnTxt}>{t("common.add")}</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -336,6 +410,19 @@ const styles = StyleSheet.create({
     borderColor: "#2a2a2a",
   },
   subHeader: { color: "#666", fontSize: 11, letterSpacing: 1.2, marginTop: 4, marginBottom: 2, fontStyle: "italic" },
+  emptySearch: { color: "#666", textAlign: "center", padding: 24, fontStyle: "italic" },
+  chosenRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+  },
+  chosenName: { color: "#f5f5f5", fontWeight: "700", fontSize: 16 },
+  chosenGame: { color: "#888", fontSize: 12, marginTop: 2 },
   btnDisabled: { opacity: 0.4 },
   modalActions: { flexDirection: "row", gap: 12, marginTop: 8 },
   btn: { flex: 1, backgroundColor: "#cbb26a", padding: 14, borderRadius: 10, alignItems: "center" },

@@ -44,6 +44,9 @@ export function makeDeck(cards: readonly Card[], shuffle: ShuffleFn = fisherYate
 }
 
 function shufflesOnDraw(card: Card): boolean {
+  // Bless ("x2") and curse ("miss") are one-shot and don't carry the shuffle
+  // icon — only the base-deck miss / x2 cards trigger an end-of-round shuffle.
+  if (card.oneShot) return false;
   return card.value === "miss" || card.value === "x2";
 }
 
@@ -223,7 +226,7 @@ export function applyPerks(baseDeck: readonly Card[], perks: readonly Perk[], co
 export function addBless(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
   const bless: Card = {
     id: cardId("bless"),
-    value: 2,
+    value: "x2",
     rolling: false,
     effects: ["bless"],
     oneShot: true,
@@ -254,6 +257,46 @@ export function addCurse(state: DeckState, shuffle: ShuffleFn = fisherYates): De
     needsShuffle: state.needsShuffle,
     previous: null,
   };
+}
+
+export function removeBless(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
+  const idx = state.drawPile.findIndex((c) => c.id.startsWith("bless-"));
+  if (idx < 0) {
+    return { ...state, previous: null };
+  }
+  const drawPile = state.drawPile.slice();
+  drawPile.splice(idx, 1);
+  return {
+    drawPile: shuffle(drawPile),
+    discardPile: state.discardPile.slice(),
+    active: state.active.map((seq) => seq.slice()),
+    needsShuffle: state.needsShuffle,
+    previous: null,
+  };
+}
+
+export function removeCurse(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
+  const idx = state.drawPile.findIndex((c) => c.id.startsWith("curse-"));
+  if (idx < 0) {
+    return { ...state, previous: null };
+  }
+  const drawPile = state.drawPile.slice();
+  drawPile.splice(idx, 1);
+  return {
+    drawPile: shuffle(drawPile),
+    discardPile: state.discardPile.slice(),
+    active: state.active.map((seq) => seq.slice()),
+    needsShuffle: state.needsShuffle,
+    previous: null,
+  };
+}
+
+export function countBless(state: DeckState): number {
+  return state.drawPile.filter((c) => c.id.startsWith("bless-")).length;
+}
+
+export function countCurse(state: DeckState): number {
+  return state.drawPile.filter((c) => c.id.startsWith("curse-")).length;
 }
 
 export function countCards(state: DeckState): number {

@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useParty } from "@/src/state/party";
 import { useSettings } from "@/src/state/settings";
 import { Card } from "@/src/components/Card";
+import { countBless, countCurse } from "@/src/engine/deck";
 import type { Card as CardData } from "@/src/data/types";
 
 type DrawMode = "normal" | "advantage" | "disadvantage";
@@ -30,6 +31,8 @@ export default function DrawScreen() {
   const rebuildDeck = useParty((s) => s.rebuildDeck);
   const blessCharacter = useParty((s) => s.blessCharacter);
   const curseCharacter = useParty((s) => s.curseCharacter);
+  const removeBlessFromCharacter = useParty((s) => s.removeBlessFromCharacter);
+  const removeCurseFromCharacter = useParty((s) => s.removeCurseFromCharacter);
   const hapticsEnabled = useSettings((s) => s.hapticsEnabled);
 
   const [mode, setMode] = useState<DrawMode>("normal");
@@ -54,22 +57,7 @@ export default function DrawScreen() {
   const { deck } = character;
   const sequences = deck.active;
 
-  const handleDraw = () => {
-    if (isCoolingDown) return;
-
-    if (hapticsEnabled) {
-      if (deck.needsShuffle) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
-    }
-    if (mode === "normal") {
-      drawCard(character.id);
-    } else {
-      drawCardAdvantage(character.id);
-    }
-
+  const startCooldown = () => {
     setIsCoolingDown(true);
     cooldownFill.value = 0;
     cooldownFill.value = withTiming(1, {
@@ -80,19 +68,52 @@ export default function DrawScreen() {
     cooldownTimer.current = setTimeout(() => setIsCoolingDown(false), DRAW_COOLDOWN_MS);
   };
 
-  const handleShuffleNow = () => {
-    if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  const handleDraw = () => {
+    if (isCoolingDown) return;
+
+    if (deck.needsShuffle) {
+      if (hapticsEnabled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+      shuffleAll(character.id);
+      startCooldown();
+      return;
     }
-    shuffleAll(character.id);
+
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    if (mode === "normal") {
+      drawCard(character.id);
+    } else {
+      drawCardAdvantage(character.id);
+    }
+    startCooldown();
+  };
+
+  const handleBlessAdd = () => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    blessCharacter(character.id);
+  };
+  const handleBlessRemove = () => {
+    if (hapticsEnabled) Haptics.selectionAsync();
+    removeBlessFromCharacter(character.id);
+  };
+  const handleCurseAdd = () => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    curseCharacter(character.id);
+  };
+  const handleCurseRemove = () => {
+    if (hapticsEnabled) Haptics.selectionAsync();
+    removeCurseFromCharacter(character.id);
   };
 
   const baseDrawLabel = mode === "normal" ? t("draw.drawBtn") : t("draw.drawTwice");
-  const drawLabel = deck.needsShuffle
-    ? t("draw.shuffleAndDraw", { label: baseDrawLabel })
-    : baseDrawLabel;
+  const drawLabel = deck.needsShuffle ? t("draw.shuffleBtn") : baseDrawLabel;
   const showAdvHint = mode !== "normal" && sequences.length === 2;
   const advLabel = mode === "advantage" ? t("draw.pickBetter") : t("draw.pickWorse");
+  const blessCount = countBless(deck);
+  const curseCount = countCurse(deck);
 
   return (
     <View style={styles.root}>
@@ -129,12 +150,6 @@ export default function DrawScreen() {
         )}
       </View>
 
-      {deck.needsShuffle ? (
-        <Pressable style={styles.shuffleNow} onPress={handleShuffleNow}>
-          <Text style={styles.shuffleNowTxt}>{t("draw.shuffleNow")}</Text>
-        </Pressable>
-      ) : null}
-
       <View style={styles.actions}>
         <Pressable
           style={[styles.action, !deck.previous && styles.actionDisabled]}
@@ -143,12 +158,20 @@ export default function DrawScreen() {
         >
           <Text style={[styles.actionTxt, !deck.previous && styles.actionTxtDisabled]}>{t("draw.undo")}</Text>
         </Pressable>
-        <Pressable style={styles.bless} onPress={() => blessCharacter(character.id)}>
-          <Text style={styles.blessTxt}>{t("draw.bless")}</Text>
-        </Pressable>
-        <Pressable style={styles.curse} onPress={() => curseCharacter(character.id)}>
-          <Text style={styles.curseTxt}>{t("draw.curse")}</Text>
-        </Pressable>
+        <CountControl
+          tone="bless"
+          label={t("draw.blessLabel")}
+          count={blessCount}
+          onAdd={handleBlessAdd}
+          onRemove={handleBlessRemove}
+        />
+        <CountControl
+          tone="curse"
+          label={t("draw.curseLabel")}
+          count={curseCount}
+          onAdd={handleCurseAdd}
+          onRemove={handleCurseRemove}
+        />
       </View>
 
       <View style={styles.actions}>
@@ -212,6 +235,49 @@ function ModeBtn({ label, active, onPress }: { label: string; active: boolean; o
   );
 }
 
+function CountControl({
+  tone,
+  label,
+  count,
+  onAdd,
+  onRemove,
+}: {
+  tone: "bless" | "curse";
+  label: string;
+  count: number;
+  onAdd: () => void;
+  onRemove: () => void;
+}) {
+  const rowStyle = tone === "bless" ? styles.blessRow : styles.curseRow;
+  const txtStyle = tone === "bless" ? styles.blessTxt : styles.curseTxt;
+  const chipStyle = tone === "bless" ? styles.blessChip : styles.curseChip;
+  const disabled = count <= 0;
+  return (
+    <View style={[styles.countCtl, rowStyle]}>
+      <Pressable
+        style={[styles.countChip, chipStyle, disabled && styles.countChipDisabled]}
+        onPress={onRemove}
+        disabled={disabled}
+        hitSlop={6}
+      >
+        <Text style={[txtStyle, disabled && styles.countChipTxtDisabled]}>−</Text>
+      </Pressable>
+      <View style={styles.countCenter} pointerEvents="none">
+        <Text style={[txtStyle, styles.countLabel]} numberOfLines={1}>
+          {label} · {count}
+        </Text>
+      </View>
+      <Pressable
+        style={[styles.countChip, chipStyle]}
+        onPress={onAdd}
+        hitSlop={6}
+      >
+        <Text style={txtStyle}>+</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function SequenceView({ sequence, size = "lg" }: { sequence: CardData[]; size?: "lg" | "md" }) {
   if (sequence.length === 0) return null;
   if (sequence.length === 1) {
@@ -249,24 +315,33 @@ const styles = StyleSheet.create({
   twoUpCell: { alignItems: "center", justifyContent: "center" },
   advHint: { color: "#cbb26a", fontSize: 12, letterSpacing: 1.5, marginBottom: 12 },
   actions: { flexDirection: "row", gap: 8, marginBottom: 8 },
-  bless: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: "#2a1f0a", alignItems: "center" },
-  blessTxt: { color: "#cbb26a", fontWeight: "600" },
-  curse: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: "#2a0f0f", alignItems: "center" },
-  curseTxt: { color: "#cc8888", fontWeight: "600" },
+  blessTxt: { color: "#cbb26a", fontWeight: "700" },
+  curseTxt: { color: "#cc8888", fontWeight: "700" },
   action: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: "#1a1a1a", alignItems: "center" },
   actionTxt: { color: "#cbb26a", fontWeight: "600", fontSize: 13 },
   actionDisabled: { backgroundColor: "#141414" },
   actionTxtDisabled: { color: "#444" },
-  shuffleNow: {
-    backgroundColor: "#1a1709",
-    borderColor: "#cbb26a",
-    borderWidth: 1,
-    paddingVertical: 12,
+  countCtl: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "stretch",
     borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 8,
+    overflow: "hidden",
   },
-  shuffleNowTxt: { color: "#cbb26a", fontWeight: "700", letterSpacing: 1.2 },
+  blessRow: { backgroundColor: "#2a1f0a" },
+  curseRow: { backgroundColor: "#2a0f0f" },
+  countChip: {
+    paddingHorizontal: 12,
+    minWidth: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  blessChip: { backgroundColor: "#3a2c0e" },
+  curseChip: { backgroundColor: "#3a1414" },
+  countChipDisabled: { opacity: 0.35 },
+  countChipTxtDisabled: { color: "#666" },
+  countCenter: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+  countLabel: { fontSize: 12, letterSpacing: 1 },
   drawBtn: {
     backgroundColor: "#4a3f27",
     paddingVertical: 28,

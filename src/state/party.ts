@@ -12,6 +12,8 @@ import {
   reshuffleDrawPile,
   addBless,
   addCurse,
+  removeBless,
+  removeCurse,
   type DeckState,
 } from "../engine/deck";
 
@@ -37,6 +39,8 @@ type PartyState = {
   shuffleDrawPile: (id: string) => void;
   blessCharacter: (id: string) => void;
   curseCharacter: (id: string) => void;
+  removeBlessFromCharacter: (id: string) => void;
+  removeCurseFromCharacter: (id: string) => void;
 };
 
 function newCharacterId(): string {
@@ -154,6 +158,22 @@ export const useParty = create<PartyState>()(
         set({
           characters: get().characters.map((c) =>
             c.id === id ? { ...c, deck: addCurse(c.deck) } : c
+          ),
+        });
+      },
+
+      removeBlessFromCharacter: (id) => {
+        set({
+          characters: get().characters.map((c) =>
+            c.id === id ? { ...c, deck: removeBless(c.deck) } : c
+          ),
+        });
+      },
+
+      removeCurseFromCharacter: (id) => {
+        set({
+          characters: get().characters.map((c) =>
+            c.id === id ? { ...c, deck: removeCurse(c.deck) } : c
           ),
         });
       },

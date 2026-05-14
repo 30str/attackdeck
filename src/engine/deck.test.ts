@@ -11,6 +11,10 @@ import {
   applyPerks,
   addBless,
   addCurse,
+  removeBless,
+  removeCurse,
+  countBless,
+  countCurse,
   countCards,
   type ShuffleFn,
 } from "./deck";
@@ -195,12 +199,12 @@ describe("applyPerks", () => {
 });
 
 describe("bless and curse", () => {
-  it("addBless adds a single removable card", () => {
+  it("addBless adds a single removable x2 card", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const blessed = addBless(state, identityShuffle);
     expect(countCards(blessed)).toBe(21);
     const blessCard = blessed.drawPile.find((c) => c.effects.includes("bless"));
-    expect(blessCard?.value).toBe(2);
+    expect(blessCard?.value).toBe("x2");
     expect(blessCard?.oneShot).toBe(true);
   });
 
@@ -208,7 +212,7 @@ describe("bless and curse", () => {
     const blessFirst: Card[] = [
       {
         id: "b",
-        value: 2,
+        value: "x2",
         rolling: false,
         effects: ["bless"],
         oneShot: true,
@@ -222,12 +226,46 @@ describe("bless and curse", () => {
     expect(countCards(after)).toBe(20);
   });
 
+  it("drawing a bless does not trigger an end-of-round shuffle", () => {
+    const base = buildBaseDeck().filter((c) => c.value !== "x2" && c.value !== "miss");
+    const blessFirst: Card[] = [
+      {
+        id: "b",
+        value: "x2",
+        rolling: false,
+        effects: ["bless"],
+        oneShot: true,
+      },
+      ...base,
+    ];
+    const state = makeDeck(blessFirst, identityShuffle);
+    const after = draw(state, identityShuffle);
+    expect(after.needsShuffle).toBe(false);
+  });
+
   it("addCurse adds a removable miss card", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const cursed = addCurse(state, identityShuffle);
     const curseCard = cursed.drawPile.find((c) => c.effects.includes("curse"));
     expect(curseCard?.value).toBe("miss");
     expect(curseCard?.oneShot).toBe(true);
+  });
+
+  it("drawing a curse does not trigger an end-of-round shuffle", () => {
+    const base = buildBaseDeck().filter((c) => c.value !== "x2" && c.value !== "miss");
+    const curseFirst: Card[] = [
+      {
+        id: "c",
+        value: "miss",
+        rolling: false,
+        effects: ["curse"],
+        oneShot: true,
+      },
+      ...base,
+    ];
+    const state = makeDeck(curseFirst, identityShuffle);
+    const after = draw(state, identityShuffle);
+    expect(after.needsShuffle).toBe(false);
   });
 });
 
@@ -347,5 +385,73 @@ describe("undo", () => {
     const drawn = draw(state, identityShuffle);
     const r = reshuffleDrawPile(drawn, identityShuffle);
     expect(r.previous).toBeNull();
+  });
+});
+
+describe("bless/curse removal and counts", () => {
+  it("countBless reflects the number of bless cards in the draw pile", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    expect(countBless(s)).toBe(0);
+    s = addBless(s, identityShuffle);
+    s = addBless(s, identityShuffle);
+    expect(countBless(s)).toBe(2);
+    expect(countCurse(s)).toBe(0);
+  });
+
+  it("countCurse reflects the number of curse cards in the draw pile", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addCurse(s, identityShuffle);
+    s = addCurse(s, identityShuffle);
+    s = addCurse(s, identityShuffle);
+    expect(countCurse(s)).toBe(3);
+    expect(countBless(s)).toBe(0);
+  });
+
+  it("removeBless decrements the bless count and leaves other cards intact", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addBless(s, identityShuffle);
+    s = addBless(s, identityShuffle);
+    const before = s.drawPile.length;
+    s = removeBless(s, identityShuffle);
+    expect(countBless(s)).toBe(1);
+    expect(s.drawPile.length).toBe(before - 1);
+    s = removeBless(s, identityShuffle);
+    expect(countBless(s)).toBe(0);
+  });
+
+  it("removeBless is a no-op when there are no bless cards", () => {
+    const s = makeDeck(buildBaseDeck(), identityShuffle);
+    const after = removeBless(s, identityShuffle);
+    expect(after.drawPile).toHaveLength(s.drawPile.length);
+    expect(countBless(after)).toBe(0);
+  });
+
+  it("removeCurse decrements only curse cards", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addBless(s, identityShuffle);
+    s = addCurse(s, identityShuffle);
+    s = addCurse(s, identityShuffle);
+    s = removeCurse(s, identityShuffle);
+    expect(countCurse(s)).toBe(1);
+    expect(countBless(s)).toBe(1);
+  });
+
+  it("removeCurse is a no-op when there are no curse cards", () => {
+    const s = makeDeck(buildBaseDeck(), identityShuffle);
+    const after = removeCurse(s, identityShuffle);
+    expect(after.drawPile).toHaveLength(s.drawPile.length);
+    expect(countCurse(after)).toBe(0);
+  });
+
+  it("removeBless and removeCurse clear the undo snapshot", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addBless(s, identityShuffle);
+    s = addCurse(s, identityShuffle);
+    s = draw(s, identityShuffle);
+    expect(s.previous).not.toBeNull();
+    const afterRemoveBless = removeBless(s, identityShuffle);
+    expect(afterRemoveBless.previous).toBeNull();
+    const afterRemoveCurse = removeCurse(s, identityShuffle);
+    expect(afterRemoveCurse.previous).toBeNull();
   });
 });
