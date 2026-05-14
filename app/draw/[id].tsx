@@ -9,10 +9,14 @@ import Animated, {
 import { useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useTranslation } from "react-i18next";
+import { Image } from "expo-image";
 import { useParty } from "@/src/state/party";
 import { useSettings } from "@/src/state/settings";
 import { Card } from "@/src/components/Card";
+import { ClassIcon } from "@/src/components/ClassIcon";
 import { countBless, countCurse } from "@/src/engine/deck";
+import { findClass } from "@/src/data";
+import { CLASS_PORTRAITS } from "@/src/assets/classPortraits";
 import type { Card as CardData } from "@/src/data/types";
 
 type DrawMode = "normal" | "advantage" | "disadvantage";
@@ -114,11 +118,16 @@ export default function DrawScreen() {
   const advLabel = mode === "advantage" ? t("draw.pickBetter") : t("draw.pickWorse");
   const blessCount = countBless(deck);
   const curseCount = countCurse(deck);
+  const klass = findClass(character.classId);
+  const portrait = CLASS_PORTRAITS[character.classId];
 
   return (
     <View style={styles.root}>
       <View style={styles.top}>
-        <Text style={styles.name}>{character.name}</Text>
+        <View style={styles.nameRow}>
+          {klass ? <ClassIcon klass={klass} size={36} /> : null}
+          <Text style={styles.name}>{character.name}</Text>
+        </View>
         <Text style={styles.counts}>
           {t("draw.counts", { draw: deck.drawPile.length, discard: deck.discardPile.length })}
           {deck.needsShuffle ? `  · ${t("draw.shufflePending")}` : ""}
@@ -132,6 +141,14 @@ export default function DrawScreen() {
       </View>
 
       <View style={styles.cardArea}>
+        {portrait ? (
+          <Image
+            source={portrait}
+            style={styles.cardAreaBg}
+            contentFit="contain"
+            pointerEvents="none"
+          />
+        ) : null}
         {sequences.length === 0 ? (
           <Text style={styles.placeholder}>{t("draw.tapToDraw")}</Text>
         ) : sequences.length === 1 ? (
@@ -303,6 +320,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0a0a0a", padding: 16 },
   empty: { color: "#888", padding: 24 },
   top: { alignItems: "center", marginBottom: 8 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   name: { color: "#f5f5f5", fontSize: 18, fontWeight: "600" },
   counts: { color: "#888", marginTop: 4, fontSize: 12 },
   modeRow: { flexDirection: "row", gap: 6, marginBottom: 8 },
@@ -311,6 +329,14 @@ const styles = StyleSheet.create({
   modeBtnTxt: { color: "#888", fontSize: 12, fontWeight: "600", letterSpacing: 1 },
   modeBtnTxtActive: { color: "#cbb26a" },
   cardArea: { flex: 1, alignItems: "center", justifyContent: "center" },
+  cardAreaBg: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    opacity: 0.22,
+  },
   placeholder: { color: "#444", fontSize: 16 },
   rolling: { gap: 8, paddingHorizontal: 8, alignItems: "center" },
   twoUp: { flex: 1, justifyContent: "center", alignItems: "center", width: "100%" },

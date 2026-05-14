@@ -23,7 +23,8 @@
     "test:watch": "vitest",
     "verify-data": "npx tsx scripts/verify-data.ts",
     "generate-icons": "npx tsx scripts/generate-icons.ts",
-    "build-perk-i18n": "npx tsx scripts/build-perk-i18n.ts"
+    "build-perk-i18n": "npx tsx scripts/build-perk-i18n.ts",
+    "fetch-class-portraits": "npx tsx scripts/fetch-class-portraits.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

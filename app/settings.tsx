@@ -101,6 +101,7 @@ export default function SettingsScreen() {
       <View style={styles.block}>
         <Text style={styles.body}>{t("settings.creditsDesign")}</Text>
         <Text style={styles.body}>{t("settings.creditsData")}</Text>
+        <Text style={styles.body}>{t("settings.creditsArt")}</Text>
         <Text style={styles.body}>{t("settings.creditsApp")}</Text>
         <Text
           style={[styles.body, styles.link]}
