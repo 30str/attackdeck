@@ -264,7 +264,10 @@ function CountControl({
       </Pressable>
       <View style={styles.countCenter} pointerEvents="none">
         <Text style={[txtStyle, styles.countLabel]} numberOfLines={1}>
-          {label} · {count}
+          {label}
+        </Text>
+        <Text style={[txtStyle, styles.countNum]} numberOfLines={1}>
+          {count}
         </Text>
       </View>
       <Pressable
@@ -322,7 +325,7 @@ const styles = StyleSheet.create({
   actionDisabled: { backgroundColor: "#141414" },
   actionTxtDisabled: { color: "#444" },
   countCtl: {
-    flex: 1,
+    flex: 2,
     flexDirection: "row",
     alignItems: "stretch",
     borderRadius: 10,
@@ -331,8 +334,8 @@ const styles = StyleSheet.create({
   blessRow: { backgroundColor: "#2a1f0a" },
   curseRow: { backgroundColor: "#2a0f0f" },
   countChip: {
-    paddingHorizontal: 12,
-    minWidth: 36,
+    paddingHorizontal: 8,
+    minWidth: 28,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -340,8 +343,9 @@ const styles = StyleSheet.create({
   curseChip: { backgroundColor: "#3a1414" },
   countChipDisabled: { opacity: 0.35 },
   countChipTxtDisabled: { color: "#666" },
-  countCenter: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
-  countLabel: { fontSize: 12, letterSpacing: 1 },
+  countCenter: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 8 },
+  countLabel: { fontSize: 11, letterSpacing: 0.5 },
+  countNum: { fontSize: 14, marginTop: 1 },
   drawBtn: {
     backgroundColor: "#4a3f27",
     paddingVertical: 28,
