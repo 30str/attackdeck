@@ -3,7 +3,7 @@
     "name": "Attack Deck",
     "slug": "attackdeck",
     "version": "1.0.1",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "attackdeck",
     "userInterfaceStyle": "dark",

@@ -3,6 +3,9 @@
 //
 // Art © Isaac Childres / Cephalofair Games, used under CC BY-NC-SA 4.0
 // via the Gloomhaven Creator Pack. See LICENSE-ART.md.
+//
+// Each require() points at the @1x file; Metro auto-resolves the @2x/@3x
+// siblings sitting next to it and bundles each at the correct density.
 
 export const CLASS_ICONS: Record<string, number> = {
   "ccug-alchemancer": require("../../assets/images/classes/icons/ccug-alchemancer.png"),
