@@ -27,6 +27,7 @@ type PartyState = {
   characters: Character[];
   addCharacter: (name: string, classId: string) => string;
   removeCharacter: (id: string) => void;
+  renameCharacter: (id: string, name: string) => void;
   togglePerk: (id: string, perkId: string, delta: 1 | -1) => void;
   rebuildDeck: (id: string) => void;
   drawCard: (id: string) => void;
@@ -70,6 +71,14 @@ export const useParty = create<PartyState>()(
 
       removeCharacter: (id) => {
         set({ characters: get().characters.filter((c) => c.id !== id) });
+      },
+
+      renameCharacter: (id, name) => {
+        set({
+          characters: get().characters.map((c) =>
+            c.id === id ? { ...c, name } : c
+          ),
+        });
       },
 
       togglePerk: (id, perkId, delta) => {

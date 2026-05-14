@@ -27,7 +27,8 @@
   },
   "character": {
     "resetDeck": "Reset deck to start of scenario",
-    "openDraw": "Open draw screen"
+    "openDraw": "Open draw screen",
+    "renameHint": "Tap to rename"
   },
   "draw": {
     "counts": "{{draw}} draw · {{discard}} discard",

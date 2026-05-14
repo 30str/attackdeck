@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useParty } from "@/src/state/party";
@@ -10,6 +11,9 @@ export default function CharacterScreen() {
   const character = useParty((s) => s.characters.find((c) => c.id === id));
   const togglePerk = useParty((s) => s.togglePerk);
   const rebuildDeck = useParty((s) => s.rebuildDeck);
+  const renameCharacter = useParty((s) => s.renameCharacter);
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState("");
 
   if (!character) {
     return (
@@ -28,10 +32,44 @@ export default function CharacterScreen() {
     );
   }
 
+  const startEditingName = () => {
+    setDraftName(character.name);
+    setEditingName(true);
+  };
+
+  const commitName = () => {
+    const trimmed = draftName.trim();
+    renameCharacter(character.id, trimmed || klass.name);
+    setEditingName(false);
+  };
+
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.heading}>{character.name}</Text>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        {editingName ? (
+          <TextInput
+            value={draftName}
+            onChangeText={setDraftName}
+            onSubmitEditing={commitName}
+            onBlur={commitName}
+            autoFocus
+            selectTextOnFocus
+            returnKeyType="done"
+            placeholder={klass.name}
+            placeholderTextColor="#444"
+            style={styles.headingInput}
+          />
+        ) : (
+          <Pressable
+            onPress={startEditingName}
+            accessibilityLabel={character.name}
+            accessibilityHint={t("character.renameHint")}
+            style={styles.headingRow}
+          >
+            <Text style={styles.heading}>{character.name}</Text>
+            <Text style={styles.editGlyph}>✎</Text>
+          </Pressable>
+        )}
         <Text style={styles.sub}>{klass.name} · {t(`games.${klass.game}`)}</Text>
 
         <Text style={styles.section}>{t("common.perks")}</Text>
@@ -86,6 +124,17 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 120, gap: 8 },
   empty: { color: "#888", padding: 24 },
   heading: { color: "#f5f5f5", fontSize: 28, fontWeight: "700" },
+  headingRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  editGlyph: { color: "#888", fontSize: 18 },
+  headingInput: {
+    color: "#f5f5f5",
+    fontSize: 28,
+    fontWeight: "700",
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "#cbb26a",
+  },
   sub: { color: "#888", marginBottom: 16 },
   section: { color: "#cbb26a", fontSize: 14, letterSpacing: 1.5, marginTop: 16, marginBottom: 8 },
   perk: {

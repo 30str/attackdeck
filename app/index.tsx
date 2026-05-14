@@ -49,13 +49,14 @@ export default function PartyScreen() {
   };
 
   const handleAdd = () => {
-    const trimmed = name.trim();
-    if (!trimmed || !classId || !isAvailable(classId)) return;
-    const id = addCharacter(trimmed, classId);
+    if (!classId || !isAvailable(classId)) return;
+    const klass = findClass(classId);
+    if (!klass) return;
+    const finalName = name.trim() || klass.name;
+    addCharacter(finalName, classId);
     setName("");
     setAddOpen(false);
     setPendingUnlock(null);
-    router.push(`/character/${id}`);
   };
 
   const handleCloseModal = () => {
@@ -293,6 +294,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#2a2a2a",
     gap: 12,
+    maxHeight: "90%",
+    flexShrink: 1,
   },
   modalTitle: { color: "#f5f5f5", fontSize: 18, fontWeight: "700" },
   modalLabel: { color: "#888", marginTop: 4 },
@@ -320,7 +323,7 @@ const styles = StyleSheet.create({
   unlockHint: { color: "#cbb26a", fontSize: 11, marginTop: 4, letterSpacing: 1 },
   classRowTxt: { color: "#f5f5f5", fontWeight: "600" },
   classRowGame: { color: "#888", fontSize: 12 },
-  classList: { maxHeight: 420 },
+  classList: { maxHeight: 420, flexShrink: 1, minHeight: 120 },
   gameHeader: { color: "#cbb26a", fontSize: 12, letterSpacing: 1.5, marginTop: 8, marginBottom: 2 },
   categoryHeader: {
     color: "#888",
