@@ -4,6 +4,7 @@ import { useSettings } from "@/src/state/settings";
 import { CLASSES } from "@/src/data";
 import { isUnlockable } from "@/src/data/types";
 import { SUPPORTED_LOCALES, type SupportedLocale } from "@/src/i18n";
+import { CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -116,7 +117,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0a0a0a" },
-  scroll: { padding: 16, paddingBottom: 48, gap: 6 },
+  scroll: { padding: 16, paddingBottom: 48, gap: 6, width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
   section: { color: "#cbb26a", fontSize: 12, letterSpacing: 1.5, marginTop: 18, marginBottom: 6 },
   row: {
     flexDirection: "row",

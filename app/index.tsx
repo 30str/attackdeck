@@ -7,6 +7,7 @@ import { useSettings } from "@/src/state/settings";
 import { CLASSES, GAMES, findClass } from "@/src/data";
 import { isUnlockable } from "@/src/data/types";
 import { ClassIcon } from "@/src/components/ClassIcon";
+import { CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
 
 export default function PartyScreen() {
   const { t } = useTranslation();
@@ -164,18 +165,20 @@ export default function PartyScreen() {
         />
       )}
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => {
-          if (pendingDeleteId) {
-            dismissPendingDelete();
-            return;
-          }
-          openAddModal();
-        }}
-      >
-        <Text style={styles.fabTxt}>{t("party.addBtn")}</Text>
-      </Pressable>
+      <View style={styles.fabBar} pointerEvents="box-none">
+        <Pressable
+          style={styles.fab}
+          onPress={() => {
+            if (pendingDeleteId) {
+              dismissPendingDelete();
+              return;
+            }
+            openAddModal();
+          }}
+        >
+          <Text style={styles.fabTxt}>{t("party.addBtn")}</Text>
+        </Pressable>
+      </View>
 
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={handleCloseModal}>
         <KeyboardAvoidingView
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   emptyTitle: { color: "#f5f5f5", fontSize: 20, fontWeight: "600" },
   emptyBody: { color: "#888", marginTop: 8 },
-  list: { padding: 16, gap: 12 },
+  list: { padding: 16, gap: 12, width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -348,11 +351,17 @@ const styles = StyleSheet.create({
   editTxt: { color: "#cbb26a", fontWeight: "600" },
   remove: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: "#5a1f25", borderRadius: 8 },
   removeTxt: { color: "#f5d5d5", fontWeight: "700", letterSpacing: 1 },
-  fab: {
+  fabBar: {
     position: "absolute",
+    left: 0,
+    right: 0,
     bottom: 24,
-    left: 16,
-    right: 16,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  fab: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
     backgroundColor: "#cbb26a",
     paddingVertical: 16,
     borderRadius: 12,
@@ -361,6 +370,9 @@ const styles = StyleSheet.create({
   fabTxt: { color: "#0a0a0a", fontWeight: "700", fontSize: 16 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
   modal: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     backgroundColor: "#0f0f0f",
     padding: 20,
     borderTopLeftRadius: 16,

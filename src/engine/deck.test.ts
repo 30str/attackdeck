@@ -319,7 +319,7 @@ describe("undo", () => {
     expect(undone.active).toEqual([]);
     expect(undone.drawPile).toHaveLength(20);
     expect(undone.discardPile).toHaveLength(0);
-    expect(undone.previous).toBeNull();
+    expect(undone.history).toEqual([]);
   });
 
   it("puts the drawn card back on top of the draw pile", () => {
@@ -363,28 +363,40 @@ describe("undo", () => {
     expect(undo(state)).toEqual(state);
   });
 
-  it("only supports one step of undo", () => {
+  it("steps back through multiple draws to the start of the deck", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const d1 = draw(state, identityShuffle);
     const d2 = draw(d1, identityShuffle);
-    const u1 = undo(d2);
-    expect(u1.drawPile).toHaveLength(d1.drawPile.length);
+    const d3 = draw(d2, identityShuffle);
+    const u1 = undo(d3);
+    expect(u1.drawPile).toHaveLength(d2.drawPile.length);
     const u2 = undo(u1);
-    expect(u2).toEqual(u1);
+    expect(u2.drawPile).toHaveLength(d1.drawPile.length);
+    const u3 = undo(u2);
+    expect(u3.drawPile).toHaveLength(20);
+    expect(u3.active).toEqual([]);
+    expect(u3.history).toEqual([]);
+    const u4 = undo(u3);
+    expect(u4).toEqual(u3);
   });
 
-  it("reshuffleAll clears the undo snapshot", () => {
+  it("reshuffleAll can be undone", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const drawn = draw(state, identityShuffle);
     const r = reshuffleAll(drawn, identityShuffle);
-    expect(r.previous).toBeNull();
+    expect(r.active).toEqual([]);
+    const undone = undo(r);
+    expect(undone.active).toEqual(drawn.active);
+    expect(undone.discardPile).toHaveLength(drawn.discardPile.length);
   });
 
-  it("reshuffleDrawPile clears the undo snapshot", () => {
+  it("reshuffleDrawPile can be undone", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const drawn = draw(state, identityShuffle);
     const r = reshuffleDrawPile(drawn, identityShuffle);
-    expect(r.previous).toBeNull();
+    const undone = undo(r);
+    expect(undone.active).toEqual(drawn.active);
+    expect(undone.discardPile).toHaveLength(drawn.discardPile.length);
   });
 });
 
@@ -443,15 +455,19 @@ describe("bless/curse removal and counts", () => {
     expect(countCurse(after)).toBe(0);
   });
 
-  it("removeBless and removeCurse clear the undo snapshot", () => {
+  it("removeBless and removeCurse can be undone", () => {
     let s = makeDeck(buildBaseDeck(), identityShuffle);
     s = addBless(s, identityShuffle);
     s = addCurse(s, identityShuffle);
-    s = draw(s, identityShuffle);
-    expect(s.previous).not.toBeNull();
+    const blessBefore = countBless(s);
+    const curseBefore = countCurse(s);
+
     const afterRemoveBless = removeBless(s, identityShuffle);
-    expect(afterRemoveBless.previous).toBeNull();
+    expect(countBless(afterRemoveBless)).toBe(blessBefore - 1);
+    expect(countBless(undo(afterRemoveBless))).toBe(blessBefore);
+
     const afterRemoveCurse = removeCurse(s, identityShuffle);
-    expect(afterRemoveCurse.previous).toBeNull();
+    expect(countCurse(afterRemoveCurse)).toBe(curseBefore - 1);
+    expect(countCurse(undo(afterRemoveCurse))).toBe(curseBefore);
   });
 });

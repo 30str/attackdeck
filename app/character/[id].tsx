@@ -4,6 +4,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useParty } from "@/src/state/party";
 import { findClass } from "@/src/data";
+import { CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
 
 export default function CharacterScreen() {
   const { t } = useTranslation();
@@ -75,14 +76,15 @@ export default function CharacterScreen() {
         <Text style={styles.section}>{t("common.perks")}</Text>
         {klass.perks.map((perk) => {
           const applied = character.perkCounts[perk.id] ?? 0;
+          const maxed = applied >= perk.count;
           const description = t(`perks.${klass.id}.${perk.id}`, {
             defaultValue: perk.description,
           });
           return (
-            <View key={perk.id} style={styles.perk}>
+            <View key={perk.id} style={[styles.perk, maxed && styles.perkMaxed]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.perkDesc}>{description}</Text>
-                <Text style={styles.perkMeta}>
+                <Text style={[styles.perkMeta, maxed && styles.perkMetaMaxed]}>
                   {applied} / {perk.count}
                 </Text>
               </View>
@@ -112,16 +114,18 @@ export default function CharacterScreen() {
         </Pressable>
       </ScrollView>
 
-      <Pressable style={styles.fab} onPress={() => router.push(`/draw/${character.id}`)}>
-        <Text style={styles.fabTxt}>{t("character.openDraw")}</Text>
-      </Pressable>
+      <View style={styles.fabBar} pointerEvents="box-none">
+        <Pressable style={styles.fab} onPress={() => router.push(`/draw/${character.id}`)}>
+          <Text style={styles.fabTxt}>{t("character.openDraw")}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0a0a0a" },
-  scroll: { padding: 16, paddingBottom: 120, gap: 8 },
+  scroll: { padding: 16, paddingBottom: 120, gap: 8, width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
   empty: { color: "#888", padding: 24 },
   heading: { color: "#f5f5f5", fontSize: 28, fontWeight: "700" },
   headingRow: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -147,8 +151,10 @@ const styles = StyleSheet.create({
     borderColor: "#2a2a2a",
     gap: 12,
   },
+  perkMaxed: { borderColor: "#cbb26a", backgroundColor: "#1a1709" },
   perkDesc: { color: "#f5f5f5", fontSize: 15 },
   perkMeta: { color: "#888", fontSize: 12, marginTop: 4 },
+  perkMetaMaxed: { color: "#cbb26a", fontWeight: "700" },
   counter: { flexDirection: "row", gap: 8 },
   counterBtn: {
     width: 40,
@@ -170,11 +176,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   secondaryTxt: { color: "#cbb26a", fontWeight: "600" },
-  fab: {
+  fabBar: {
     position: "absolute",
+    left: 0,
+    right: 0,
     bottom: 24,
-    left: 16,
-    right: 16,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  fab: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
     backgroundColor: "#cbb26a",
     paddingVertical: 16,
     borderRadius: 12,

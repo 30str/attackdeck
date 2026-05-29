@@ -181,6 +181,22 @@ export const useParty = create<PartyState>()(
     {
       name: "party",
       storage: createJSONStorage(() => persistStorage),
+      version: 1,
+      // v0 decks used a single-step `previous` snapshot; v1 uses a `history`
+      // stack. Drop the dead field and seed an empty stack so rehydrated decks
+      // don't crash pushHistory()/canUndo() on the first action after upgrade.
+      migrate: (persisted, version) => {
+        const state = persisted as { characters?: Character[] } | undefined;
+        if (state?.characters && version < 1) {
+          state.characters = state.characters.map((c) => {
+            if (!c.deck) return c;
+            const { previous, ...deck } = c.deck as DeckState & { previous?: unknown };
+            void previous;
+            return { ...c, deck: { ...deck, history: deck.history ?? [] } };
+          });
+        }
+        return state as PartyState;
+      },
     }
   )
 );

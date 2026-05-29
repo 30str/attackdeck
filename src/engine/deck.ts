@@ -8,8 +8,14 @@ export type DeckSnapshot = {
 };
 
 export type DeckState = DeckSnapshot & {
-  previous: DeckSnapshot | null;
+  // Undo stack: snapshots of prior states, oldest first. Every mutating op
+  // pushes the pre-op state; undo() pops the most recent. Cleared only by a
+  // full rebuild (makeDeck), so undo walks all the way back to the deck's
+  // start. Capped to keep the persisted state bounded over a long session.
+  history: DeckSnapshot[];
 };
+
+const MAX_HISTORY = 100;
 
 function snapshot(state: DeckState): DeckSnapshot {
   return {
@@ -18,6 +24,13 @@ function snapshot(state: DeckState): DeckSnapshot {
     active: state.active.map((seq) => seq.slice()),
     needsShuffle: state.needsShuffle,
   };
+}
+
+// Produce the next DeckState, recording the prior state on the undo stack.
+function pushHistory(prev: DeckState, next: DeckSnapshot): DeckState {
+  const history = prev.history.concat(snapshot(prev));
+  if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
+  return { ...next, history };
 }
 
 export type ShuffleFn = <T>(arr: readonly T[]) => T[];
@@ -39,7 +52,7 @@ export function makeDeck(cards: readonly Card[], shuffle: ShuffleFn = fisherYate
     discardPile: [],
     active: [],
     needsShuffle: false,
-    previous: null,
+    history: [],
   };
 }
 
@@ -98,36 +111,38 @@ function drawOnce(
 }
 
 export function draw(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
-  const prev = snapshot(state);
   const result = drawOnce(state.drawPile, state.discardPile, state.needsShuffle, shuffle);
-  return {
+  return pushHistory(state, {
     drawPile: result.drawPile,
     discardPile: result.discardPile,
     active: [result.sequence],
     needsShuffle: result.needsShuffle,
-    previous: prev,
-  };
+  });
 }
 
 export function drawAdvantage(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
-  const prev = snapshot(state);
   const first = drawOnce(state.drawPile, state.discardPile, state.needsShuffle, shuffle);
   // Both advantage draws happen before any shuffle (shuffle is end-of-round per
   // the Gloomhaven rule). Pass needsShuffleAtStart=false so the second draw
   // doesn't reshuffle just because the first one revealed miss or x2.
   const second = drawOnce(first.drawPile, first.discardPile, false, shuffle);
-  return {
+  return pushHistory(state, {
     drawPile: second.drawPile,
     discardPile: second.discardPile,
     active: [first.sequence, second.sequence],
     needsShuffle: first.needsShuffle || second.needsShuffle,
-    previous: prev,
-  };
+  });
 }
 
 export function undo(state: DeckState): DeckState {
-  if (!state.previous) return state;
-  return { ...state.previous, previous: null };
+  if (state.history.length === 0) return state;
+  const history = state.history.slice();
+  const prev = history.pop()!;
+  return { ...prev, history };
+}
+
+export function canUndo(state: DeckState): boolean {
+  return state.history.length > 0;
 }
 
 export function reshuffle(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
@@ -136,13 +151,12 @@ export function reshuffle(state: DeckState, shuffle: ShuffleFn = fisherYates): D
   // through this too, but draw() immediately overwrites active with the new
   // drawn sequence so the clear is invisible in that path.
   const combined = state.drawPile.concat(state.discardPile);
-  return {
+  return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: [],
     active: [],
     needsShuffle: false,
-    previous: null,
-  };
+  });
 }
 
 export function reshuffleAll(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
@@ -150,13 +164,12 @@ export function reshuffleAll(state: DeckState, shuffle: ShuffleFn = fisherYates)
 }
 
 export function reshuffleDrawPile(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
-  return {
+  return pushHistory(state, {
     drawPile: shuffle(state.drawPile),
     discardPile: state.discardPile.slice(),
     active: [],
     needsShuffle: false,
-    previous: null,
-  };
+  });
 }
 
 export function peek(state: DeckState, n: number, shuffle: ShuffleFn = fisherYates): {
@@ -232,13 +245,12 @@ export function addBless(state: DeckState, shuffle: ShuffleFn = fisherYates): De
     oneShot: true,
   };
   const combined = state.drawPile.concat([bless]);
-  return {
+  return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
     needsShuffle: state.needsShuffle,
-    previous: null,
-  };
+  });
 }
 
 export function addCurse(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
@@ -250,45 +262,38 @@ export function addCurse(state: DeckState, shuffle: ShuffleFn = fisherYates): De
     oneShot: true,
   };
   const combined = state.drawPile.concat([curse]);
-  return {
+  return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
     needsShuffle: state.needsShuffle,
-    previous: null,
-  };
+  });
 }
 
 export function removeBless(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
   const idx = state.drawPile.findIndex((c) => c.id.startsWith("bless-"));
-  if (idx < 0) {
-    return { ...state, previous: null };
-  }
+  if (idx < 0) return state;
   const drawPile = state.drawPile.slice();
   drawPile.splice(idx, 1);
-  return {
+  return pushHistory(state, {
     drawPile: shuffle(drawPile),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
     needsShuffle: state.needsShuffle,
-    previous: null,
-  };
+  });
 }
 
 export function removeCurse(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
   const idx = state.drawPile.findIndex((c) => c.id.startsWith("curse-"));
-  if (idx < 0) {
-    return { ...state, previous: null };
-  }
+  if (idx < 0) return state;
   const drawPile = state.drawPile.slice();
   drawPile.splice(idx, 1);
-  return {
+  return pushHistory(state, {
     drawPile: shuffle(drawPile),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
     needsShuffle: state.needsShuffle,
-    previous: null,
-  };
+  });
 }
 
 export function countBless(state: DeckState): number {

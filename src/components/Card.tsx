@@ -68,9 +68,10 @@ export function Card({ card, size = "lg" }: CardProps) {
     const idleBorder = card.value === "miss" ? "#5a1f25" : card.value === "x2" ? "#1f5a25" : "#2a2a2a";
     return {
       opacity: Math.min(1, flip.value * 1.4),
+      backfaceVisibility: "hidden",
       transform: [
         { perspective: 900 },
-        { rotateY: `${(1 - flip.value) * 110}deg` },
+        { rotateY: `${(1 - flip.value) * 90}deg` },
         { scale: interpolate(flip.value, [0, 0.55, 1], [0.72, 1.12, 1.0]) },
       ],
       borderColor: interpolateColor(glow.value, [0, 1], [idleBorder, "#cbb26a"]),
