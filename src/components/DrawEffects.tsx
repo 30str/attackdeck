@@ -108,15 +108,17 @@ export function DrawEffects({ tier, nonce }: { tier: EffectTier | null; nonce: n
   );
 }
 
-// Full-screen celebration: a soft gold glow blooming from center plus a few
-// concentric rings sweeping outward to fill the screen.
+// Celebration: a soft gold central bloom plus rings sweeping outward. Sizes are
+// capped so the big translucent layers don't explode in overdraw on large/Retina
+// screens (iPad) — the full-screen feel comes from the cheap flash + particles.
 function Splash({ progress, diag }: { progress: Shared; diag: number }) {
+  const glowSize = Math.min(diag * 0.7, 520);
+  const ringSize = Math.min(diag, 1200);
   return (
     <View style={styles.center} pointerEvents="none">
-      <Glow progress={progress} size={diag * 1.3} />
-      <Ring progress={progress} size={diag} delay={0} />
-      <Ring progress={progress} size={diag} delay={0.14} />
-      <Ring progress={progress} size={diag} delay={0.28} />
+      <Glow progress={progress} size={glowSize} />
+      <Ring progress={progress} size={ringSize} delay={0} />
+      <Ring progress={progress} size={ringSize} delay={0.16} />
     </View>
   );
 }
