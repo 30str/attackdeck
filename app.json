@@ -2,8 +2,8 @@
   "expo": {
     "name": "Attack Deck",
     "slug": "attackdeck",
-    "version": "1.0.4",
-    "orientation": "portrait",
+    "version": "1.0.5",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "attackdeck",
     "userInterfaceStyle": "dark",

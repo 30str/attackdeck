@@ -2,8 +2,9 @@ import { useEffect } from "react";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { Link, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Pressable, Text } from "react-native";
+import { Dimensions, Pressable, Text } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as ScreenOrientation from "expo-screen-orientation";
 import "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 import i18n, { detectDeviceLocale } from "@/src/i18n";
@@ -19,6 +20,18 @@ export default function RootLayout() {
       i18n.changeLanguage(target);
     }
   }, [languageOverride]);
+
+  // Lock portrait on phones, but leave large screens (tablets/foldables)
+  // rotatable. The manifest no longer restricts orientation (Android 16 ignores
+  // that on large screens anyway) — we enforce it at runtime for phones only.
+  useEffect(() => {
+    const { width, height } = Dimensions.get("screen");
+    const isLargeScreen = Math.min(width, height) >= 600;
+    const apply = isLargeScreen
+      ? ScreenOrientation.unlockAsync()
+      : ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    apply.catch(() => {});
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
