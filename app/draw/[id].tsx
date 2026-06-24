@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import Animated, {
   useSharedValue,
@@ -67,6 +67,13 @@ export default function DrawScreen() {
   });
   const cooldownFill = useSharedValue(1); // 1 = full / ready, 0 = just pressed
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear the tier once the flourish finishes so DrawEffects unmounts its
+  // particle tree instead of keeping it alive (invisible) until the next draw.
+  // Keep the nonce so the next trigger still remounts fresh particles.
+  const handleEffectDone = useCallback(() => {
+    setEffect((e) => (e.tier ? { ...e, tier: null } : e));
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -268,7 +275,7 @@ export default function DrawScreen() {
         fill={cooldownFill}
       />
       </Bounded>
-      <DrawEffects tier={effect.tier} nonce={effect.nonce} />
+      <DrawEffects tier={effect.tier} nonce={effect.nonce} onDone={handleEffectDone} />
     </View>
   );
 }
@@ -284,8 +291,11 @@ function DrawButton({
   disabled: boolean;
   fill: ReturnType<typeof useSharedValue<number>>;
 }) {
+  // scaleX instead of width: width is a layout prop, so animating it forces a
+  // re-layout every frame for the full cooldown second; a transform stays on
+  // the compositor.
   const fillStyle = useAnimatedStyle(() => ({
-    width: `${fill.value * 100}%`,
+    transform: [{ scaleX: fill.value }],
   }));
   return (
     <Pressable style={styles.drawBtn} onPress={onPress} disabled={disabled}>
@@ -438,9 +448,11 @@ const styles = StyleSheet.create({
   drawBtnFill: {
     position: "absolute",
     left: 0,
+    right: 0,
     top: 0,
     bottom: 0,
     backgroundColor: "#cbb26a",
+    transformOrigin: "left",
   },
   drawTxt: { color: "#0a0a0a", fontWeight: "800", fontSize: 22, letterSpacing: 2 },
 });

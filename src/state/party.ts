@@ -47,6 +47,13 @@ function newCharacterId(): string {
   return `c-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
+// How many undo snapshots survive serialisation. The in-memory stack holds up
+// to MAX_HISTORY (100) entries, but persisting all of them makes every single
+// mutation re-stringify hundreds of KB of JSON on the JS thread — right when
+// the draw animation is starting. Ten steps of undo across an app restart is
+// plenty; a live session still gets the full stack.
+const PERSISTED_HISTORY = 10;
+
 function rebuild(character: Character): DeckState {
   const klass = findClass(character.classId);
   const base = klass?.startingDeck === "base" || !klass ? buildBaseDeck() : klass.startingDeck;
@@ -182,6 +189,13 @@ export const useParty = create<PartyState>()(
       name: "party",
       storage: createJSONStorage(() => persistStorage),
       version: 1,
+      partialize: (state) => ({
+        characters: state.characters.map((c) =>
+          c.deck.history.length > PERSISTED_HISTORY
+            ? { ...c, deck: { ...c.deck, history: c.deck.history.slice(-PERSISTED_HISTORY) } }
+            : c
+        ),
+      }),
       // v0 decks used a single-step `previous` snapshot; v1 uses a `history`
       // stack. Drop the dead field and seed an empty stack so rehydrated decks
       // don't crash pushHistory()/canUndo() on the first action after upgrade.

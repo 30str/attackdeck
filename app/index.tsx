@@ -1,13 +1,23 @@
-import { useState } from "react";
-import { View, Text, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, Modal } from "react-native";
+import { memo, useCallback, useMemo, useState } from "react";
+import { View, Text, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, Modal } from "react-native";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { useParty } from "@/src/state/party";
+import { useParty, type Character } from "@/src/state/party";
 import { useSettings } from "@/src/state/settings";
 import { CLASSES, GAMES, findClass } from "@/src/data";
 import { isUnlockable } from "@/src/data/types";
 import { ClassIcon } from "@/src/components/ClassIcon";
 import { CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
+
+type ClassEntry = (typeof CLASSES)[number];
+
+// Flat row model for the class-picker FlatList: headers and class rows in one
+// virtualized list instead of ~100 always-mounted rows in a ScrollView.
+type PickerItem =
+  | { kind: "fan-divider"; key: string }
+  | { kind: "game-header"; key: string; gameId: string }
+  | { kind: "unlockable-header"; key: string }
+  | { kind: "class"; key: string; klass: ClassEntry; unlockable: boolean };
 
 export default function PartyScreen() {
   const { t } = useTranslation();
@@ -42,26 +52,62 @@ export default function PartyScreen() {
     setAddOpen(true);
   };
 
-  const handleClassPress = (k: typeof CLASSES[number]) => {
-    if (!isUnlockable(k)) {
-      setClassId(k.id);
-      setStep("name");
-      return;
+  const handleClassPress = useCallback(
+    (k: ClassEntry) => {
+      if (!isUnlockable(k)) {
+        setClassId(k.id);
+        setStep("name");
+        return;
+      }
+      if (unlockedClasses.includes(k.id)) {
+        setClassId(k.id);
+        setStep("name");
+        return;
+      }
+      if (pendingUnlock === k.id) {
+        unlock(k.id);
+        setPendingUnlock(null);
+        setClassId(k.id);
+        setStep("name");
+      } else {
+        setPendingUnlock(k.id);
+      }
+    },
+    [pendingUnlock, unlockedClasses, unlock]
+  );
+
+  // Rebuilt only when the search text or unlock set changes — not on every
+  // render — and consumed by a virtualized FlatList below.
+  const pickerItems = useMemo<PickerItem[]>(() => {
+    const firstFanId = GAMES.find((g) => g.category === "fan")?.id;
+    const q = query.trim().toLowerCase();
+    const matches = (c: ClassEntry) => {
+      if (!q) return true;
+      const unlocked = !isUnlockable(c) || unlockedClasses.includes(c.id);
+      const haystack = unlocked ? c.name : c.codeName ?? c.name;
+      return haystack.toLowerCase().includes(q);
+    };
+    const items: PickerItem[] = [];
+    for (const g of GAMES) {
+      const classesForGame = CLASSES.filter((c) => c.game === g.id && matches(c));
+      if (classesForGame.length === 0) continue;
+      if (g.id === firstFanId) {
+        items.push({ kind: "fan-divider", key: "fan-divider" });
+      }
+      items.push({ kind: "game-header", key: `game-${g.id}`, gameId: g.id });
+      for (const c of classesForGame) {
+        if (!isUnlockable(c)) items.push({ kind: "class", key: c.id, klass: c, unlockable: false });
+      }
+      const lockable = classesForGame.filter((c) => isUnlockable(c));
+      if (lockable.length > 0) {
+        items.push({ kind: "unlockable-header", key: `unlockable-${g.id}` });
+        for (const c of lockable) {
+          items.push({ kind: "class", key: c.id, klass: c, unlockable: true });
+        }
+      }
     }
-    if (unlockedClasses.includes(k.id)) {
-      setClassId(k.id);
-      setStep("name");
-      return;
-    }
-    if (pendingUnlock === k.id) {
-      unlock(k.id);
-      setPendingUnlock(null);
-      setClassId(k.id);
-      setStep("name");
-    } else {
-      setPendingUnlock(k.id);
-    }
-  };
+    return items;
+  }, [query, unlockedClasses]);
 
   const handleAdd = () => {
     if (!classId || !isAvailable(classId)) return;
@@ -90,26 +136,39 @@ export default function PartyScreen() {
 
   const chosenClass = step === "name" ? findClass(classId) : null;
 
-  const handleRowPress = (id: string) => {
-    if (pendingDeleteId) {
-      dismissPendingDelete();
-      return;
-    }
-    router.push(`/draw/${id}`);
-  };
+  // Stable identities so the memoized CharacterRow only re-renders when its
+  // own character or pending-delete flag changes — not on every party update.
+  const handleRowPress = useCallback(
+    (id: string) => {
+      if (pendingDeleteId) {
+        setPendingDeleteId(null);
+        return;
+      }
+      router.push(`/draw/${id}`);
+    },
+    [pendingDeleteId]
+  );
 
-  const handlePerksPress = (id: string) => {
-    if (pendingDeleteId) {
-      dismissPendingDelete();
-      return;
-    }
-    router.push(`/character/${id}`);
-  };
+  const handlePerksPress = useCallback(
+    (id: string) => {
+      if (pendingDeleteId) {
+        setPendingDeleteId(null);
+        return;
+      }
+      router.push(`/character/${id}`);
+    },
+    [pendingDeleteId]
+  );
 
-  const handleConfirmRemove = (id: string) => {
-    removeCharacter(id);
-    dismissPendingDelete();
-  };
+  const handleConfirmRemove = useCallback(
+    (id: string) => {
+      removeCharacter(id);
+      setPendingDeleteId(null);
+    },
+    [removeCharacter]
+  );
+
+  const handleRowLongPress = useCallback((id: string) => setPendingDeleteId(id), []);
 
   return (
     <Pressable
@@ -128,40 +187,17 @@ export default function PartyScreen() {
           data={characters}
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => {
-            const klass = findClass(item.classId);
-            const pending = pendingDeleteId === item.id;
-            return (
-              <Pressable
-                style={[styles.row, pending && styles.rowPending]}
-                onPress={() => handleRowPress(item.id)}
-                onLongPress={() => setPendingDeleteId(item.id)}
-              >
-                {klass ? <ClassIcon klass={klass} size={44} /> : null}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowName}>{item.name}</Text>
-                  <Text style={styles.rowSub}>{klass?.name ?? t("common.unknownClass")}</Text>
-                </View>
-                {pending ? (
-                  <Pressable
-                    hitSlop={12}
-                    onPress={() => handleConfirmRemove(item.id)}
-                    style={styles.remove}
-                  >
-                    <Text style={styles.removeTxt}>{t("party.remove")}</Text>
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    hitSlop={12}
-                    onPress={() => handlePerksPress(item.id)}
-                    style={styles.edit}
-                  >
-                    <Text style={styles.editTxt}>{t("common.perks")}</Text>
-                  </Pressable>
-                )}
-              </Pressable>
-            );
-          }}
+          extraData={pendingDeleteId}
+          renderItem={({ item }) => (
+            <CharacterRow
+              character={item}
+              pending={pendingDeleteId === item.id}
+              onPress={handleRowPress}
+              onLongPress={handleRowLongPress}
+              onPerks={handlePerksPress}
+              onConfirmRemove={handleConfirmRemove}
+            />
+          )}
         />
       )}
 
@@ -199,86 +235,43 @@ export default function PartyScreen() {
                   autoCorrect={false}
                   autoCapitalize="none"
                 />
-                <ScrollView
+                <FlatList
                   style={styles.classList}
-                  contentContainerStyle={{ gap: 6 }}
+                  contentContainerStyle={styles.classListContent}
                   keyboardShouldPersistTaps="handled"
-                >
-                  {(() => {
-                    const firstFanId = GAMES.find((g) => g.category === "fan")?.id;
-                    const q = query.trim().toLowerCase();
-                    const matches = (c: typeof CLASSES[number]) => {
-                      if (!q) return true;
-                      const unlocked = !isUnlockable(c) || unlockedClasses.includes(c.id);
-                      const haystack = unlocked ? c.name : c.codeName ?? c.name;
-                      return haystack.toLowerCase().includes(q);
-                    };
-                    const visibleGames = GAMES.filter((g) =>
-                      CLASSES.some((c) => c.game === g.id && matches(c))
-                    );
-                    if (visibleGames.length === 0) {
-                      return (
-                        <Text style={styles.emptySearch}>{t("party.noMatches")}</Text>
-                      );
+                  data={pickerItems}
+                  keyExtractor={(item) => item.key}
+                  extraData={pendingUnlock}
+                  ListEmptyComponent={
+                    <Text style={styles.emptySearch}>{t("party.noMatches")}</Text>
+                  }
+                  renderItem={({ item }) => {
+                    switch (item.kind) {
+                      case "fan-divider":
+                        return (
+                          <Text style={styles.categoryHeader}>
+                            {t("party.fanExpansionsHeader")}
+                          </Text>
+                        );
+                      case "game-header":
+                        return <Text style={styles.gameHeader}>{t(`games.${item.gameId}`)}</Text>;
+                      case "unlockable-header":
+                        return <Text style={styles.subHeader}>{t("party.unlockableHeader")}</Text>;
+                      case "class":
+                        return (
+                          <ClassPickerRow
+                            klass={item.klass}
+                            unlockable={item.unlockable}
+                            unlocked={
+                              !item.unlockable || unlockedClasses.includes(item.klass.id)
+                            }
+                            pending={pendingUnlock === item.klass.id}
+                            onPress={handleClassPress}
+                          />
+                        );
                     }
-                    return visibleGames.map((g) => {
-                      const classesForGame = CLASSES.filter((c) => c.game === g.id && matches(c));
-                      const starters = classesForGame.filter((c) => !isUnlockable(c));
-                      const lockable = classesForGame.filter((c) => isUnlockable(c));
-                      const showFanDivider = g.id === firstFanId;
-                      return (
-                        <View key={g.id} style={{ gap: 6 }}>
-                          {showFanDivider ? (
-                            <Text style={styles.categoryHeader}>
-                              {t("party.fanExpansionsHeader")}
-                            </Text>
-                          ) : null}
-                          <Text style={styles.gameHeader}>{t(`games.${g.id}`)}</Text>
-                          {starters.map((c) => (
-                            <Pressable
-                              key={c.id}
-                              onPress={() => handleClassPress(c)}
-                              style={styles.classRow}
-                            >
-                              <ClassIcon klass={c} size={32} />
-                              <Text style={styles.classRowTxt}>{c.name}</Text>
-                            </Pressable>
-                          ))}
-                          {lockable.length > 0 ? (
-                            <Text style={styles.subHeader}>{t("party.unlockableHeader")}</Text>
-                          ) : null}
-                          {lockable.map((c) => {
-                            const unlocked = unlockedClasses.includes(c.id);
-                            const pending = pendingUnlock === c.id;
-                            return (
-                              <Pressable
-                                key={c.id}
-                                onPress={() => handleClassPress(c)}
-                                style={[
-                                  styles.classRow,
-                                  !unlocked && styles.classRowLocked,
-                                  pending && styles.classRowPending,
-                                ]}
-                              >
-                                <ClassIcon klass={c} locked={!unlocked} size={32} />
-                                {unlocked ? (
-                                  <Text style={styles.classRowTxt}>{c.name}</Text>
-                                ) : pending ? (
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={styles.classRowTxt}>{c.codeName}</Text>
-                                    <Text style={styles.unlockHint}>{t("party.tapAgainToReveal")}</Text>
-                                  </View>
-                                ) : (
-                                  <Text style={styles.classRowLockedTxt}>{c.codeName}</Text>
-                                )}
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                      );
-                    });
-                  })()}
-                </ScrollView>
+                  }}
+                />
                 <View style={styles.modalActions}>
                   <Pressable style={styles.btnGhost} onPress={handleCloseModal}>
                     <Text style={styles.btnGhostTxt}>{t("common.cancel")}</Text>
@@ -290,7 +283,7 @@ export default function PartyScreen() {
                 {chosenClass ? (
                   <View style={styles.chosenRow}>
                     <ClassIcon klass={chosenClass} size={36} />
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.flex1}>
                       <Text style={styles.chosenName}>{chosenClass.name}</Text>
                       <Text style={styles.chosenGame}>{t(`games.${chosenClass.game}`)}</Text>
                     </View>
@@ -328,7 +321,105 @@ export default function PartyScreen() {
   );
 }
 
+// Memoized so background party updates (a draw on another screen) and
+// pending-delete toggles only re-render the rows whose props actually changed.
+const CharacterRow = memo(function CharacterRow({
+  character,
+  pending,
+  onPress,
+  onLongPress,
+  onPerks,
+  onConfirmRemove,
+}: {
+  character: Character;
+  pending: boolean;
+  onPress: (id: string) => void;
+  onLongPress: (id: string) => void;
+  onPerks: (id: string) => void;
+  onConfirmRemove: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const klass = findClass(character.classId);
+  return (
+    <Pressable
+      style={[styles.row, pending && styles.rowPending]}
+      onPress={() => onPress(character.id)}
+      onLongPress={() => onLongPress(character.id)}
+    >
+      {klass ? <ClassIcon klass={klass} size={44} /> : null}
+      <View style={styles.flex1}>
+        <Text style={styles.rowName}>{character.name}</Text>
+        <Text style={styles.rowSub}>{klass?.name ?? t("common.unknownClass")}</Text>
+      </View>
+      {pending ? (
+        <Pressable
+          hitSlop={12}
+          onPress={() => onConfirmRemove(character.id)}
+          style={styles.remove}
+        >
+          <Text style={styles.removeTxt}>{t("party.remove")}</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          hitSlop={12}
+          onPress={() => onPerks(character.id)}
+          style={styles.edit}
+        >
+          <Text style={styles.editTxt}>{t("common.perks")}</Text>
+        </Pressable>
+      )}
+    </Pressable>
+  );
+});
+
+const ClassPickerRow = memo(function ClassPickerRow({
+  klass,
+  unlockable,
+  unlocked,
+  pending,
+  onPress,
+}: {
+  klass: ClassEntry;
+  unlockable: boolean;
+  unlocked: boolean;
+  pending: boolean;
+  onPress: (k: ClassEntry) => void;
+}) {
+  const { t } = useTranslation();
+  if (!unlockable) {
+    return (
+      <Pressable onPress={() => onPress(klass)} style={styles.classRow}>
+        <ClassIcon klass={klass} size={32} />
+        <Text style={styles.classRowTxt}>{klass.name}</Text>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      onPress={() => onPress(klass)}
+      style={[
+        styles.classRow,
+        !unlocked && styles.classRowLocked,
+        pending && styles.classRowPending,
+      ]}
+    >
+      <ClassIcon klass={klass} locked={!unlocked} size={32} />
+      {unlocked ? (
+        <Text style={styles.classRowTxt}>{klass.name}</Text>
+      ) : pending ? (
+        <View style={styles.flex1}>
+          <Text style={styles.classRowTxt}>{klass.codeName}</Text>
+          <Text style={styles.unlockHint}>{t("party.tapAgainToReveal")}</Text>
+        </View>
+      ) : (
+        <Text style={styles.classRowLockedTxt}>{klass.codeName}</Text>
+      )}
+    </Pressable>
+  );
+});
+
 const styles = StyleSheet.create({
+  flex1: { flex: 1 },
   root: { flex: 1, backgroundColor: "#0a0a0a" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   emptyTitle: { color: "#f5f5f5", fontSize: 20, fontWeight: "600" },
@@ -410,6 +501,7 @@ const styles = StyleSheet.create({
   classRowTxt: { color: "#f5f5f5", fontWeight: "600" },
   classRowGame: { color: "#888", fontSize: 12 },
   classList: { maxHeight: 420, flexShrink: 1, minHeight: 120 },
+  classListContent: { gap: 6 },
   gameHeader: { color: "#cbb26a", fontSize: 12, letterSpacing: 1.5, marginTop: 8, marginBottom: 2 },
   categoryHeader: {
     color: "#888",

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import type { ClassDef } from "../data/types";
@@ -30,7 +31,9 @@ function monogram(name: string): string {
   return single.slice(0, 2).toUpperCase() || "??";
 }
 
-export function ClassIcon({ klass, locked = false, size = 36 }: ClassIconProps) {
+// Memoized: class defs are module constants, so the props are referentially
+// stable and re-renders of list rows skip the hue hashing + style rebuild.
+export const ClassIcon = memo(function ClassIcon({ klass, locked = false, size = 36 }: ClassIconProps) {
   const hue = locked ? 0 : hueFromId(klass.id);
   const bg = locked ? "#1a1a1a" : `hsl(${hue}, 32%, 18%)`;
   const border = locked ? "#2a2a2a" : `hsl(${hue}, 38%, 42%)`;
@@ -93,7 +96,7 @@ export function ClassIcon({ klass, locked = false, size = 36 }: ClassIconProps) 
       </Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   box: {

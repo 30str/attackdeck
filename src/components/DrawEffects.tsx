@@ -8,6 +8,7 @@ import Animated, {
   interpolate,
   Extrapolation,
   Easing,
+  runOnJS,
 } from "react-native-reanimated";
 
 // Reveal flourish keyed to the drawn card:
@@ -56,7 +57,15 @@ function buildParticles(tier: EffectTier, diag: number): Particle[] {
 
 type Shared = ReturnType<typeof useSharedValue<number>>;
 
-export function DrawEffects({ tier, nonce }: { tier: EffectTier | null; nonce: number }) {
+export function DrawEffects({
+  tier,
+  nonce,
+  onDone,
+}: {
+  tier: EffectTier | null;
+  nonce: number;
+  onDone?: () => void;
+}) {
   const { width, height } = useWindowDimensions();
   const diag = Math.hypot(width, height);
   const progress = useSharedValue(0);
@@ -71,10 +80,21 @@ export function DrawEffects({ tier, nonce }: { tier: EffectTier | null; nonce: n
   useEffect(() => {
     if (!tier || nonce === 0) return;
     progress.value = 0;
-    progress.value = withTiming(1, {
-      duration: tier === "special" ? 1100 : tier === "positive" ? 1150 : 950,
-      easing: Easing.out(Easing.cubic),
-    });
+    progress.value = withTiming(
+      1,
+      {
+        duration: tier === "special" ? 1100 : tier === "positive" ? 1150 : 950,
+        easing: Easing.out(Easing.cubic),
+      },
+      // `progress` outlives `flash` in every tier, so its completion marks the
+      // end of the whole flourish. Signal the owner so it can null out `tier`
+      // and unmount this tree — otherwise dozens of Animated.Views linger at
+      // opacity 0 for the rest of the screen's life. A retriggered draw
+      // cancels the previous timing (finished=false), so no stale callbacks.
+      (finished) => {
+        if (finished && onDone) runOnJS(onDone)();
+      },
+    );
     flash.value = withSequence(
       withTiming(1, { duration: tier === "positive" ? 130 : 90 }),
       withTiming(0, {
@@ -82,7 +102,7 @@ export function DrawEffects({ tier, nonce }: { tier: EffectTier | null; nonce: n
         easing: Easing.in(Easing.cubic),
       }),
     );
-  }, [nonce, tier, progress, flash]);
+  }, [nonce, tier, progress, flash, onDone]);
 
   if (!tier) return null;
 
