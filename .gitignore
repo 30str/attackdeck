@@ -35,6 +35,7 @@ yarn-error.*
 
 # personal AI assistant context (kept locally)
 CLAUDE.md
+.claude/
 
 # typescript
 *.tsbuildinfo
