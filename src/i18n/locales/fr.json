@@ -3,6 +3,7 @@
     "cancel": "Annuler",
     "add": "Ajouter",
     "back": "Retour",
+    "done": "Terminé",
     "reset": "Réinitialiser",
     "characterNotFound": "Personnage introuvable.",
     "unknownClass": "Classe inconnue.",
@@ -49,7 +50,10 @@
     "shuffleAll": "Tout mélanger",
     "drawBtn": "TIRER",
     "shuffleBtn": "MÉLANGER",
-    "drawTwice": "TIRER × 2"
+    "drawTwice": "TIRER × 2",
+    "tempCards": "Cartes temp.",
+    "tempTitle": "Cartes temporaires",
+    "tempBody": "Les effets de scénario ou d'objet ajoutent parfois des cartes de modificateur simples à ton paquet. Elles vont à la défausse et sont remélangées comme les cartes normales, et restent dans le paquet jusqu'à ce que tu les retires ici ou réinitialises le paquet."
   },
   "settings": {
     "preferences": "Préférences",
@@ -124,6 +128,7 @@
     "safeguard": "SAUVEG.",
     "refresh-item": "RECHARGE",
     "refresh-spent": "RECHARGE",
+    "temp": "TEMP",
     "custom": "★"
   },
   "languages": {

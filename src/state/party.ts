@@ -14,7 +14,10 @@ import {
   addCurse,
   removeBless,
   removeCurse,
+  addTempCard,
+  removeTempCard,
   type DeckState,
+  type TempCardValue,
 } from "../engine/deck";
 
 export type Character = {
@@ -41,6 +44,8 @@ type PartyState = {
   curseCharacter: (id: string) => void;
   removeBlessFromCharacter: (id: string) => void;
   removeCurseFromCharacter: (id: string) => void;
+  addTempToCharacter: (id: string, value: TempCardValue) => void;
+  removeTempFromCharacter: (id: string, value: TempCardValue) => void;
 };
 
 function newCharacterId(): string {
@@ -181,6 +186,22 @@ export const useParty = create<PartyState>()(
         set({
           characters: get().characters.map((c) =>
             c.id === id ? { ...c, deck: removeCurse(c.deck) } : c
+          ),
+        });
+      },
+
+      addTempToCharacter: (id, value) => {
+        set({
+          characters: get().characters.map((c) =>
+            c.id === id ? { ...c, deck: addTempCard(c.deck, value) } : c
+          ),
+        });
+      },
+
+      removeTempFromCharacter: (id, value) => {
+        set({
+          characters: get().characters.map((c) =>
+            c.id === id ? { ...c, deck: removeTempCard(c.deck, value) } : c
           ),
         });
       },

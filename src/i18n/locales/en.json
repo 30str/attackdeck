@@ -3,6 +3,7 @@
     "cancel": "Cancel",
     "add": "Add",
     "back": "Back",
+    "done": "Done",
     "reset": "Reset",
     "characterNotFound": "Character not found.",
     "unknownClass": "Unknown class.",
@@ -50,7 +51,10 @@
     "shuffleAll": "Shuffle all",
     "drawBtn": "DRAW",
     "shuffleBtn": "SHUFFLE",
-    "drawTwice": "DRAW × 2"
+    "drawTwice": "DRAW × 2",
+    "tempCards": "Temp cards",
+    "tempTitle": "Temporary cards",
+    "tempBody": "Scenario and item effects sometimes add plain modifier cards to your deck. They go to the discard and shuffle back in like normal cards, and stay in the deck until you remove them here or reset the deck."
   },
   "settings": {
     "preferences": "Preferences",
@@ -126,6 +130,7 @@
     "safeguard": "SAFEGUARD",
     "refresh-item": "REFRESH",
     "refresh-spent": "REFRESH",
+    "temp": "TEMP",
     "custom": "★"
   },
   "languages": {

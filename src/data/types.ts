@@ -47,6 +47,7 @@ export type Effect =
   | "chill"
   | "dodge"
   | "safeguard"
+  | "temp"
   | "custom";
 
 export type CardValue = number | "miss" | "x2";

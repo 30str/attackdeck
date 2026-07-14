@@ -3,6 +3,7 @@
     "cancel": "Abbrechen",
     "add": "Hinzufügen",
     "back": "Zurück",
+    "done": "Fertig",
     "reset": "Zurücksetzen",
     "characterNotFound": "Charakter nicht gefunden.",
     "unknownClass": "Unbekannte Klasse.",
@@ -49,7 +50,10 @@
     "shuffleAll": "Alles mischen",
     "drawBtn": "ZIEHEN",
     "shuffleBtn": "MISCHEN",
-    "drawTwice": "ZIEHEN × 2"
+    "drawTwice": "ZIEHEN × 2",
+    "tempCards": "Temp-Karten",
+    "tempTitle": "Temporäre Karten",
+    "tempBody": "Szenario- und Gegenstandseffekte fügen deinem Stapel manchmal einfache Modifikatorkarten hinzu. Sie kommen wie normale Karten auf die Ablage und werden wieder eingemischt – sie bleiben im Stapel, bis du sie hier entfernst oder den Stapel zurücksetzt."
   },
   "settings": {
     "preferences": "Einstellungen",
@@ -124,6 +128,7 @@
     "safeguard": "SCHUTZ",
     "refresh-item": "AUFFR.",
     "refresh-spent": "AUFFR.",
+    "temp": "TEMP",
     "custom": "★"
   },
   "languages": {

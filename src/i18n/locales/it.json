@@ -3,6 +3,7 @@
     "cancel": "Annulla",
     "add": "Aggiungi",
     "back": "Indietro",
+    "done": "Fatto",
     "reset": "Reimposta",
     "characterNotFound": "Personaggio non trovato.",
     "unknownClass": "Classe sconosciuta.",
@@ -49,7 +50,10 @@
     "shuffleAll": "Rimescola tutto",
     "drawBtn": "PESCA",
     "shuffleBtn": "RIMESCOLA",
-    "drawTwice": "PESCA × 2"
+    "drawTwice": "PESCA × 2",
+    "tempCards": "Carte temp.",
+    "tempTitle": "Carte temporanee",
+    "tempBody": "Gli effetti di scenario o degli oggetti a volte aggiungono carte modificatore semplici al tuo mazzo. Vanno negli scarti e vengono rimescolate come le carte normali, e restano nel mazzo finché non le rimuovi qui o reimposti il mazzo."
   },
   "settings": {
     "preferences": "Preferenze",
@@ -124,6 +128,7 @@
     "safeguard": "SALVAG.",
     "refresh-item": "RICARICA",
     "refresh-spent": "RICARICA",
+    "temp": "TEMP",
     "custom": "★"
   },
   "languages": {

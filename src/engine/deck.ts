@@ -146,15 +146,15 @@ export function canUndo(state: DeckState): boolean {
 }
 
 export function reshuffle(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
-  // Manual shuffles clear `active` — the table is reset, the previously drawn
-  // card is no longer in play. The internal reshuffle inside draw() runs
-  // through this too, but draw() immediately overwrites active with the new
-  // drawn sequence so the clear is invisible in that path.
+  // `active` is preserved: it is only a view of the last-drawn cards, which
+  // are already accounted for in the piles (or gone entirely, for one-shots).
+  // Keeping it means the display still shows what was drawn last after an
+  // end-of-round or manual shuffle instead of blanking out.
   const combined = state.drawPile.concat(state.discardPile);
   return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: [],
-    active: [],
+    active: state.active.map((seq) => seq.slice()),
     needsShuffle: false,
   });
 }
@@ -167,7 +167,7 @@ export function reshuffleDrawPile(state: DeckState, shuffle: ShuffleFn = fisherY
   return pushHistory(state, {
     drawPile: shuffle(state.drawPile),
     discardPile: state.discardPile.slice(),
-    active: [],
+    active: state.active.map((seq) => seq.slice()),
     needsShuffle: false,
   });
 }
@@ -294,6 +294,72 @@ export function removeCurse(state: DeckState, shuffle: ShuffleFn = fisherYates):
     active: state.active.map((seq) => seq.slice()),
     needsShuffle: state.needsShuffle,
   });
+}
+
+// Temporary cards cover scenario/item effects like "add three -1 cards to your
+// attack modifier deck". Unlike bless/curse they are NOT one-shot: a drawn temp
+// card goes to the discard pile and shuffles back in like any base card. They
+// leave the deck only via removeTempCard or a full rebuild (deck reset).
+export const TEMP_CARD_VALUES = [-2, -1, 0, 1, 2] as const;
+export type TempCardValue = (typeof TEMP_CARD_VALUES)[number];
+
+function isTempCard(card: Card): boolean {
+  return card.id.startsWith("temp-");
+}
+
+export function addTempCard(
+  state: DeckState,
+  value: TempCardValue,
+  shuffle: ShuffleFn = fisherYates
+): DeckState {
+  const card: Card = {
+    id: cardId("temp"),
+    value,
+    rolling: false,
+    effects: ["temp"],
+  };
+  return pushHistory(state, {
+    drawPile: shuffle(state.drawPile.concat([card])),
+    discardPile: state.discardPile.slice(),
+    active: state.active.map((seq) => seq.slice()),
+    needsShuffle: state.needsShuffle,
+  });
+}
+
+export function removeTempCard(
+  state: DeckState,
+  value: TempCardValue,
+  shuffle: ShuffleFn = fisherYates
+): DeckState {
+  // Temp cards persist through draws, so one may sit in either pile. Take it
+  // out of the draw pile first; fall back to the discard.
+  const matches = (c: Card) => isTempCard(c) && c.value === value;
+  const drawIdx = state.drawPile.findIndex(matches);
+  if (drawIdx >= 0) {
+    const drawPile = state.drawPile.slice();
+    drawPile.splice(drawIdx, 1);
+    return pushHistory(state, {
+      drawPile: shuffle(drawPile),
+      discardPile: state.discardPile.slice(),
+      active: state.active.map((seq) => seq.slice()),
+      needsShuffle: state.needsShuffle,
+    });
+  }
+  const discardIdx = state.discardPile.findIndex(matches);
+  if (discardIdx < 0) return state;
+  const discardPile = state.discardPile.slice();
+  discardPile.splice(discardIdx, 1);
+  return pushHistory(state, {
+    drawPile: state.drawPile.slice(),
+    discardPile,
+    active: state.active.map((seq) => seq.slice()),
+    needsShuffle: state.needsShuffle,
+  });
+}
+
+export function countTemp(state: DeckState, value?: TempCardValue): number {
+  const matches = (c: Card) => isTempCard(c) && (value === undefined || c.value === value);
+  return state.drawPile.filter(matches).length + state.discardPile.filter(matches).length;
 }
 
 export function countBless(state: DeckState): number {

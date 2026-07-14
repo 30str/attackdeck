@@ -16,6 +16,9 @@ import {
   countBless,
   countCurse,
   countCards,
+  addTempCard,
+  removeTempCard,
+  countTemp,
   type ShuffleFn,
 } from "./deck";
 import type { Card, Perk } from "../data/types";
@@ -301,12 +304,12 @@ describe("reshuffle", () => {
     expect(r.needsShuffle).toBe(false);
   });
 
-  it("manual shuffles clear the active card display", () => {
+  it("manual shuffles keep the last drawn cards on display", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const drawn = draw(state, identityShuffle);
     expect(drawn.active).toHaveLength(1);
-    expect(reshuffleAll(drawn, identityShuffle).active).toEqual([]);
-    expect(reshuffleDrawPile(drawn, identityShuffle).active).toEqual([]);
+    expect(reshuffleAll(drawn, identityShuffle).active).toEqual(drawn.active);
+    expect(reshuffleDrawPile(drawn, identityShuffle).active).toEqual(drawn.active);
   });
 });
 
@@ -384,7 +387,7 @@ describe("undo", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const drawn = draw(state, identityShuffle);
     const r = reshuffleAll(drawn, identityShuffle);
-    expect(r.active).toEqual([]);
+    expect(r.discardPile).toEqual([]);
     const undone = undo(r);
     expect(undone.active).toEqual(drawn.active);
     expect(undone.discardPile).toHaveLength(drawn.discardPile.length);
@@ -469,5 +472,107 @@ describe("bless/curse removal and counts", () => {
     const afterRemoveCurse = removeCurse(s, identityShuffle);
     expect(countCurse(afterRemoveCurse)).toBe(curseBefore - 1);
     expect(countCurse(undo(afterRemoveCurse))).toBe(curseBefore);
+  });
+});
+
+describe("temp cards", () => {
+  it("addTempCard shuffles a persistent card of the given value into the draw pile", () => {
+    const state = makeDeck(buildBaseDeck(), identityShuffle);
+    const after = addTempCard(state, -1, identityShuffle);
+    expect(countCards(after)).toBe(21);
+    const temp = after.drawPile.find((c) => c.id.startsWith("temp-"));
+    expect(temp?.value).toBe(-1);
+    expect(temp?.oneShot).toBeUndefined();
+    expect(temp?.effects).toContain("temp");
+  });
+
+  it("a drawn temp card goes to the discard pile instead of leaving the deck", () => {
+    const tempFirst: Card[] = [
+      { id: "temp-t", value: -1, rolling: false, effects: ["temp"] },
+      ...buildBaseDeck(),
+    ];
+    const state = makeDeck(tempFirst, identityShuffle);
+    const after = draw(state, identityShuffle);
+    expect(after.active[0]![0]!.id).toBe("temp-t");
+    expect(after.discardPile.find((c) => c.id === "temp-t")).toBeDefined();
+    expect(countCards(after)).toBe(21);
+    expect(after.needsShuffle).toBe(false);
+  });
+
+  it("temp cards survive a full reshuffle", () => {
+    const tempFirst: Card[] = [
+      { id: "temp-t", value: -1, rolling: false, effects: ["temp"] },
+      ...buildBaseDeck(),
+    ];
+    let s = makeDeck(tempFirst, identityShuffle);
+    s = draw(s, identityShuffle);
+    s = reshuffleAll(s, identityShuffle);
+    expect(s.drawPile).toHaveLength(21);
+    expect(countTemp(s, -1)).toBe(1);
+  });
+
+  it("countTemp counts per value and in total across both piles", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addTempCard(s, -1, identityShuffle);
+    s = addTempCard(s, -1, identityShuffle);
+    s = addTempCard(s, 1, identityShuffle);
+    expect(countTemp(s, -1)).toBe(2);
+    expect(countTemp(s, 1)).toBe(1);
+    expect(countTemp(s, 0)).toBe(0);
+    expect(countTemp(s)).toBe(3);
+
+    // Identity shuffle keeps appended temp cards at the bottom, so drain the
+    // pile until one has been drawn into the discard.
+    while (s.discardPile.filter((c) => c.id.startsWith("temp-")).length === 0) {
+      s = draw(s, identityShuffle);
+    }
+    expect(countTemp(s)).toBe(3);
+  });
+
+  it("removeTempCard removes from the draw pile first, then the discard pile", () => {
+    const tempFirst: Card[] = [
+      { id: "temp-t", value: -1, rolling: false, effects: ["temp"] },
+      ...buildBaseDeck(),
+    ];
+    let s = makeDeck(tempFirst, identityShuffle);
+    s = addTempCard(s, -1, identityShuffle);
+    s = draw(s, identityShuffle); // temp-t drawn → sits in the discard
+    expect(countTemp(s, -1)).toBe(2);
+
+    s = removeTempCard(s, -1, identityShuffle); // one still in the draw pile
+    expect(countTemp(s, -1)).toBe(1);
+    expect(s.discardPile.find((c) => c.id === "temp-t")).toBeDefined();
+
+    s = removeTempCard(s, -1, identityShuffle); // now only the discarded one is left
+    expect(countTemp(s, -1)).toBe(0);
+    expect(s.discardPile.find((c) => c.id === "temp-t")).toBeUndefined();
+  });
+
+  it("removeTempCard only removes cards matching the requested value", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addTempCard(s, -1, identityShuffle);
+    const before = s;
+    const after = removeTempCard(s, 1, identityShuffle);
+    expect(after).toBe(before); // no +1 temp card → no-op
+    expect(countTemp(after, -1)).toBe(1);
+  });
+
+  it("removeTempCard does not touch base cards of the same value", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addTempCard(s, -1, identityShuffle);
+    s = removeTempCard(s, -1, identityShuffle);
+    expect(countCards(s)).toBe(20);
+    expect(s.drawPile.filter((c) => c.value === -1)).toHaveLength(5);
+  });
+
+  it("addTempCard and removeTempCard can be undone", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addTempCard(s, 2, identityShuffle);
+    expect(countTemp(s, 2)).toBe(1);
+    expect(countTemp(undo(s), 2)).toBe(0);
+
+    const removed = removeTempCard(s, 2, identityShuffle);
+    expect(countTemp(removed, 2)).toBe(0);
+    expect(countTemp(undo(removed), 2)).toBe(1);
   });
 });

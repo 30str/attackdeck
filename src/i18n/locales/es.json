@@ -3,6 +3,7 @@
     "cancel": "Cancelar",
     "add": "Añadir",
     "back": "Atrás",
+    "done": "Listo",
     "reset": "Reiniciar",
     "characterNotFound": "Personaje no encontrado.",
     "unknownClass": "Clase desconocida.",
@@ -49,7 +50,10 @@
     "shuffleAll": "Barajar todo",
     "drawBtn": "ROBAR",
     "shuffleBtn": "BARAJAR",
-    "drawTwice": "ROBAR × 2"
+    "drawTwice": "ROBAR × 2",
+    "tempCards": "Cartas temp.",
+    "tempTitle": "Cartas temporales",
+    "tempBody": "Los efectos de escenario u objeto a veces añaden cartas de modificador básicas a tu mazo. Van al descarte y se barajan de nuevo como cartas normales, y permanecen en el mazo hasta que las quites aquí o reinicies el mazo."
   },
   "settings": {
     "preferences": "Preferencias",
@@ -124,6 +128,7 @@
     "safeguard": "SALVAG.",
     "refresh-item": "RECARG.",
     "refresh-spent": "RECARG.",
+    "temp": "TEMP",
     "custom": "★"
   },
   "languages": {

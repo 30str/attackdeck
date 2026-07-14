@@ -24,7 +24,7 @@ const RENDERED_EFFECTS = new Set<string>([
   "brittle", "ward", "strengthen", "impair", "bane",
   "chill", "dodge", "safeguard",
   "refresh-item", "refresh-spent",
-  "custom",
+  "temp", "custom",
 ]);
 
 export type CardProps = {

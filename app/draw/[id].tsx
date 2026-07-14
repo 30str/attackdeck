@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,10 +13,17 @@ import { Image } from "expo-image";
 import { useParty } from "@/src/state/party";
 import { useSettings } from "@/src/state/settings";
 import { Card } from "@/src/components/Card";
-import { Bounded } from "@/src/components/Bounded";
+import { Bounded, CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
 import { DrawEffects, type EffectTier } from "@/src/components/DrawEffects";
 import { ClassIcon } from "@/src/components/ClassIcon";
-import { countBless, countCurse, canUndo } from "@/src/engine/deck";
+import {
+  countBless,
+  countCurse,
+  countTemp,
+  canUndo,
+  TEMP_CARD_VALUES,
+  type TempCardValue,
+} from "@/src/engine/deck";
 import { findClass } from "@/src/data";
 import { CLASS_PORTRAITS } from "@/src/assets/classPortraits";
 import type { Card as CardData } from "@/src/data/types";
@@ -32,13 +39,14 @@ const CARD_LG_W = 260;
 const CARD_LG_H = 360;
 
 // Map the just-drawn cards to a reveal flourish. x2/bless celebrate; miss/curse
-// get the negative effect; perk-added "deck modifier" cards (id `perk-*`) get a
-// subtle one. Plain base cards get nothing.
+// get the negative effect; perk-added "deck modifier" cards (id `perk-*`) and
+// scenario temp cards (id `temp-*`) get a subtle one. Plain base cards get
+// nothing.
 function tierForCards(sequences: CardData[][]): EffectTier | null {
   const cards = sequences.flat();
   if (cards.some((c) => c.value === "x2")) return "positive";
   if (cards.some((c) => c.value === "miss")) return "negative";
-  if (cards.some((c) => c.id.startsWith("perk-"))) return "special";
+  if (cards.some((c) => c.id.startsWith("perk-") || c.id.startsWith("temp-"))) return "special";
   return null;
 }
 
@@ -56,9 +64,12 @@ export default function DrawScreen() {
   const curseCharacter = useParty((s) => s.curseCharacter);
   const removeBlessFromCharacter = useParty((s) => s.removeBlessFromCharacter);
   const removeCurseFromCharacter = useParty((s) => s.removeCurseFromCharacter);
+  const addTempToCharacter = useParty((s) => s.addTempToCharacter);
+  const removeTempFromCharacter = useParty((s) => s.removeTempFromCharacter);
   const hapticsEnabled = useSettings((s) => s.hapticsEnabled);
 
   const [mode, setMode] = useState<DrawMode>("normal");
+  const [tempOpen, setTempOpen] = useState(false);
   const [isCoolingDown, setIsCoolingDown] = useState(false);
   const [cardArea, setCardArea] = useState({ w: 0, h: 0 });
   const [effect, setEffect] = useState<{ tier: EffectTier | null; nonce: number }>({
@@ -154,6 +165,14 @@ export default function DrawScreen() {
     if (hapticsEnabled) Haptics.selectionAsync();
     removeCurseFromCharacter(character.id);
   };
+  const handleTempAdd = (value: TempCardValue) => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    addTempToCharacter(character.id, value);
+  };
+  const handleTempRemove = (value: TempCardValue) => {
+    if (hapticsEnabled) Haptics.selectionAsync();
+    removeTempFromCharacter(character.id, value);
+  };
 
   const baseDrawLabel = mode === "normal" ? t("draw.drawBtn") : t("draw.drawTwice");
   const drawLabel = deck.needsShuffle ? t("draw.shuffleBtn") : baseDrawLabel;
@@ -161,6 +180,7 @@ export default function DrawScreen() {
   const advLabel = mode === "advantage" ? t("draw.pickBetter") : t("draw.pickWorse");
   const blessCount = countBless(deck);
   const curseCount = countCurse(deck);
+  const tempTotal = countTemp(deck);
   const undoable = canUndo(deck);
   const klass = findClass(character.classId);
   const portrait = CLASS_PORTRAITS[character.classId];
@@ -184,6 +204,11 @@ export default function DrawScreen() {
           {t("draw.counts", { draw: deck.drawPile.length, discard: deck.discardPile.length })}
           {deck.needsShuffle ? `  · ${t("draw.shufflePending")}` : ""}
         </Text>
+        <Pressable style={styles.tempPill} onPress={() => setTempOpen(true)} hitSlop={6}>
+          <Text style={styles.tempPillTxt}>
+            {`± ${t("draw.tempCards")}${tempTotal > 0 ? ` · ${tempTotal}` : ""}`}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.modeRow}>
@@ -275,7 +300,68 @@ export default function DrawScreen() {
         fill={cooldownFill}
       />
       </Bounded>
+
+      <Modal
+        visible={tempOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTempOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>{t("draw.tempTitle")}</Text>
+            <Text style={styles.modalBody}>{t("draw.tempBody")}</Text>
+            {TEMP_CARD_VALUES.map((v) => (
+              <TempCardRow
+                key={v}
+                value={v}
+                count={countTemp(deck, v)}
+                onAdd={() => handleTempAdd(v)}
+                onRemove={() => handleTempRemove(v)}
+              />
+            ))}
+            <Pressable style={styles.modalBtn} onPress={() => setTempOpen(false)}>
+              <Text style={styles.modalBtnTxt}>{t("common.done")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <DrawEffects tier={effect.tier} nonce={effect.nonce} onDone={handleEffectDone} />
+    </View>
+  );
+}
+
+function TempCardRow({
+  value,
+  count,
+  onAdd,
+  onRemove,
+}: {
+  value: TempCardValue;
+  count: number;
+  onAdd: () => void;
+  onRemove: () => void;
+}) {
+  const label = value > 0 ? `+${value}` : String(value);
+  const disabled = count <= 0;
+  return (
+    <View style={styles.tempRow}>
+      <View style={styles.tempValueBadge}>
+        <Text style={styles.tempValueTxt}>{label}</Text>
+      </View>
+      <Text style={[styles.tempCount, count === 0 && styles.tempCountZero]}>{count}</Text>
+      <Pressable
+        style={[styles.tempChip, disabled && styles.countChipDisabled]}
+        onPress={onRemove}
+        disabled={disabled}
+        hitSlop={6}
+      >
+        <Text style={[styles.tempChipTxt, disabled && styles.countChipTxtDisabled]}>−</Text>
+      </Pressable>
+      <Pressable style={styles.tempChip} onPress={onAdd} hitSlop={6}>
+        <Text style={styles.tempChipTxt}>＋</Text>
+      </Pressable>
     </View>
   );
 }
@@ -437,6 +523,69 @@ const styles = StyleSheet.create({
   countCenter: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 8 },
   countLabel: { fontSize: 11, letterSpacing: 0.5 },
   countNum: { fontSize: 14, marginTop: 1 },
+  tempPill: {
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#1a1a1a",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+  },
+  tempPillTxt: { color: "#cbb26a", fontSize: 11, fontWeight: "600", letterSpacing: 1 },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
+  modal: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
+    backgroundColor: "#0f0f0f",
+    padding: 20,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderTopWidth: 1,
+    borderColor: "#2a2a2a",
+    gap: 10,
+  },
+  modalTitle: { color: "#f5f5f5", fontSize: 18, fontWeight: "700" },
+  modalBody: { color: "#888", fontSize: 13, lineHeight: 18, marginBottom: 4 },
+  tempRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 10,
+    padding: 8,
+  },
+  tempValueBadge: {
+    width: 44,
+    height: 58,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#3a3a3a",
+    backgroundColor: "#101010",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tempValueTxt: { color: "#f5f5f5", fontSize: 18, fontWeight: "700" },
+  tempCount: { flex: 1, color: "#cbb26a", fontSize: 16, fontWeight: "700", textAlign: "center" },
+  tempCountZero: { color: "#555" },
+  tempChip: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: "#2a2a2a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tempChipTxt: { color: "#cbb26a", fontSize: 20, fontWeight: "700" },
+  modalBtn: {
+    backgroundColor: "#cbb26a",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  modalBtnTxt: { color: "#0a0a0a", fontWeight: "700" },
   drawBtn: {
     backgroundColor: "#4a3f27",
     paddingVertical: 28,
