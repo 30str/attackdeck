@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { persistStorage } from "./storage";
+import { persist } from "zustand/middleware";
+import { createDebouncedStorage } from "./storage";
 import type { SupportedLocale } from "../i18n";
 
 type SettingsState = {
@@ -36,7 +36,7 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "settings",
-      storage: createJSONStorage(() => persistStorage),
+      storage: createDebouncedStorage<SettingsState>(),
     }
   )
 );

@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { persistStorage } from "./storage";
+import { persist } from "zustand/middleware";
+import { createDebouncedStorage } from "./storage";
 import { findClass, buildBaseDeck } from "../data";
 import {
   applyPerks,
@@ -208,7 +208,7 @@ export const useParty = create<PartyState>()(
     }),
     {
       name: "party",
-      storage: createJSONStorage(() => persistStorage),
+      storage: createDebouncedStorage<{ characters: Character[] }>(),
       version: 1,
       partialize: (state) => ({
         characters: state.characters.map((c) =>
