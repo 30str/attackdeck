@@ -47,6 +47,7 @@
     "blessLabel": "SEGEN",
     "curseLabel": "FLUCH",
     "shuffleUndrawn": "Stapel mischen",
+    "shuffledUndrawn": "Stapel gemischt",
     "shuffleAll": "Alles mischen",
     "drawBtn": "ZIEHEN",
     "shuffleBtn": "MISCHEN",

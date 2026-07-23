@@ -30,6 +30,12 @@ const RENDERED_EFFECTS = new Set<string>([
 export type CardProps = {
   card: CardData;
   size?: "lg" | "md";
+  /** Playing-card style value index in the top-left corner, so the card stays
+   * readable when splayed behind another card in the discard stack. */
+  showCorner?: boolean;
+  /** Skip the flip/glow reveal — stack cards already had their reveal when
+   * they were drawn and must not re-flip on every re-render of the stack. */
+  animateReveal?: boolean;
 };
 
 function formatValue(value: CardData["value"]): string {
@@ -47,13 +53,14 @@ function bgFor(card: CardData): string {
   return "#1a1a1a";
 }
 
-export function Card({ card, size = "lg" }: CardProps) {
+export function Card({ card, size = "lg", showCorner = false, animateReveal = true }: CardProps) {
   const { t } = useTranslation();
   const dim = size === "lg" ? styles.lg : styles.md;
-  const flip = useSharedValue(0);
+  const flip = useSharedValue(animateReveal ? 0 : 1);
   const glow = useSharedValue(0);
 
   useEffect(() => {
+    if (!animateReveal) return;
     flip.value = 0;
     glow.value = 0;
     flip.value = withTiming(1, { duration: 480, easing: Easing.out(Easing.cubic) });
@@ -61,7 +68,7 @@ export function Card({ card, size = "lg" }: CardProps) {
       withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) }),
       withDelay(120, withTiming(0, { duration: 520, easing: Easing.in(Easing.cubic) }))
     );
-  }, [card.id, flip, glow]);
+  }, [card.id, flip, glow, animateReveal]);
 
   const animatedStyle = useAnimatedStyle(() => {
     "worklet";
@@ -81,9 +88,25 @@ export function Card({ card, size = "lg" }: CardProps) {
 
   return (
     <Animated.View style={[styles.card, dim, { backgroundColor: bgFor(card) }, animatedStyle]}>
+      {showCorner ? (
+        <Text style={[styles.corner, size === "lg" ? styles.cornerLg : styles.cornerMd]}>
+          {`${card.rolling ? "↻" : ""}${formatValue(card.value)}`}
+        </Text>
+      ) : null}
       {card.rolling ? <Text style={styles.rolling}>↻ ROLLING</Text> : null}
       <Text
-        style={[styles.value, size === "lg" ? styles.valueLg : styles.valueMd]}
+        // Word values ("MISS") get an explicit smaller size: adjustsFontSizeToFit
+        // is ignored on web and unreliable on Android, which left "MI…" ellipsis.
+        style={[
+          styles.value,
+          size === "lg"
+            ? formatValue(card.value).length > 2
+              ? styles.valueLgLong
+              : styles.valueLg
+            : formatValue(card.value).length > 2
+              ? styles.valueMdLong
+              : styles.valueMd,
+        ]}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.4}
@@ -122,12 +145,17 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginBottom: 8,
   },
+  corner: { position: "absolute", color: "#f5f5f5", fontWeight: "800" },
+  cornerLg: { top: 6, left: 9, fontSize: 15 },
+  cornerMd: { top: 3, left: 6, fontSize: 11 },
   value: {
     color: "#f5f5f5",
     fontWeight: "700",
   },
   valueLg: { fontSize: 96 },
+  valueLgLong: { fontSize: 52 },
   valueMd: { fontSize: 32 },
+  valueMdLong: { fontSize: 17 },
   effects: {
     marginTop: 12,
     flexDirection: "row",

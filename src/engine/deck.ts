@@ -4,6 +4,12 @@ export type DeckSnapshot = {
   drawPile: Card[];
   discardPile: Card[];
   active: Card[][];
+  // Chronological log of every card revealed by a draw, oldest first. The
+  // piles can't reconstruct this: one-shots (bless/curse) leave the game the
+  // moment they're drawn. Feeds the discard-cascade display; cleared by a
+  // full reshuffle (everything is back in the deck) and capped so persisted
+  // state stays bounded.
+  recentDraws: Card[];
   needsShuffle: boolean;
 };
 
@@ -16,12 +22,14 @@ export type DeckState = DeckSnapshot & {
 };
 
 const MAX_HISTORY = 100;
+const MAX_RECENT_DRAWS = 10;
 
 function snapshot(state: DeckState): DeckSnapshot {
   return {
     drawPile: state.drawPile.slice(),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   };
 }
@@ -51,6 +59,7 @@ export function makeDeck(cards: readonly Card[], shuffle: ShuffleFn = fisherYate
     drawPile: shuffle(cards),
     discardPile: [],
     active: [],
+    recentDraws: [],
     needsShuffle: false,
     history: [],
   };
@@ -116,6 +125,7 @@ export function draw(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckSt
     drawPile: result.drawPile,
     discardPile: result.discardPile,
     active: [result.sequence],
+    recentDraws: state.recentDraws.concat(result.sequence).slice(-MAX_RECENT_DRAWS),
     needsShuffle: result.needsShuffle,
   });
 }
@@ -130,6 +140,9 @@ export function drawAdvantage(state: DeckState, shuffle: ShuffleFn = fisherYates
     drawPile: second.drawPile,
     discardPile: second.discardPile,
     active: [first.sequence, second.sequence],
+    recentDraws: state.recentDraws
+      .concat(first.sequence, second.sequence)
+      .slice(-MAX_RECENT_DRAWS),
     needsShuffle: first.needsShuffle || second.needsShuffle,
   });
 }
@@ -146,15 +159,15 @@ export function canUndo(state: DeckState): boolean {
 }
 
 export function reshuffle(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
-  // `active` is preserved: it is only a view of the last-drawn cards, which
-  // are already accounted for in the piles (or gone entirely, for one-shots).
-  // Keeping it means the display still shows what was drawn last after an
-  // end-of-round or manual shuffle instead of blanking out.
+  // `active` is cleared: after a full shuffle every drawn card is back in the
+  // deck, so leaving the last draw on display would show stale information.
+  // The screen resets to its empty "tap to draw" state (undo restores it).
   const combined = state.drawPile.concat(state.discardPile);
   return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: [],
-    active: state.active.map((seq) => seq.slice()),
+    active: [],
+    recentDraws: [],
     needsShuffle: false,
   });
 }
@@ -168,6 +181,7 @@ export function reshuffleDrawPile(state: DeckState, shuffle: ShuffleFn = fisherY
     drawPile: shuffle(state.drawPile),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: false,
   });
 }
@@ -249,6 +263,7 @@ export function addBless(state: DeckState, shuffle: ShuffleFn = fisherYates): De
     drawPile: shuffle(combined),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
 }
@@ -266,6 +281,7 @@ export function addCurse(state: DeckState, shuffle: ShuffleFn = fisherYates): De
     drawPile: shuffle(combined),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
 }
@@ -279,6 +295,7 @@ export function removeBless(state: DeckState, shuffle: ShuffleFn = fisherYates):
     drawPile: shuffle(drawPile),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
 }
@@ -292,6 +309,7 @@ export function removeCurse(state: DeckState, shuffle: ShuffleFn = fisherYates):
     drawPile: shuffle(drawPile),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
 }
@@ -322,6 +340,7 @@ export function addTempCard(
     drawPile: shuffle(state.drawPile.concat([card])),
     discardPile: state.discardPile.slice(),
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
 }
@@ -342,6 +361,7 @@ export function removeTempCard(
       drawPile: shuffle(drawPile),
       discardPile: state.discardPile.slice(),
       active: state.active.map((seq) => seq.slice()),
+      recentDraws: state.recentDraws.slice(),
       needsShuffle: state.needsShuffle,
     });
   }
@@ -353,6 +373,7 @@ export function removeTempCard(
     drawPile: state.drawPile.slice(),
     discardPile,
     active: state.active.map((seq) => seq.slice()),
+    recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
 }

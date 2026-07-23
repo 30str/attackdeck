@@ -209,7 +209,7 @@ export const useParty = create<PartyState>()(
     {
       name: "party",
       storage: createDebouncedStorage<{ characters: Character[] }>(),
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         characters: state.characters.map((c) =>
           c.deck.history.length > PERSISTED_HISTORY
@@ -220,6 +220,7 @@ export const useParty = create<PartyState>()(
       // v0 decks used a single-step `previous` snapshot; v1 uses a `history`
       // stack. Drop the dead field and seed an empty stack so rehydrated decks
       // don't crash pushHistory()/canUndo() on the first action after upgrade.
+      // v2 adds `recentDraws` to decks and to every history snapshot.
       migrate: (persisted, version) => {
         const state = persisted as { characters?: Character[] } | undefined;
         if (state?.characters && version < 1) {
@@ -228,6 +229,22 @@ export const useParty = create<PartyState>()(
             const { previous, ...deck } = c.deck as DeckState & { previous?: unknown };
             void previous;
             return { ...c, deck: { ...deck, history: deck.history ?? [] } };
+          });
+        }
+        if (state?.characters && version < 2) {
+          state.characters = state.characters.map((c) => {
+            if (!c.deck) return c;
+            return {
+              ...c,
+              deck: {
+                ...c.deck,
+                recentDraws: c.deck.recentDraws ?? [],
+                history: (c.deck.history ?? []).map((s) => ({
+                  ...s,
+                  recentDraws: s.recentDraws ?? [],
+                })),
+              },
+            };
           });
         }
         return state as PartyState;

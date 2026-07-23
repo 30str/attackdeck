@@ -272,6 +272,43 @@ describe("bless and curse", () => {
   });
 });
 
+describe("recentDraws", () => {
+  it("logs drawn cards in order, including one-shots absent from the piles", () => {
+    const bless: Card = { id: "b", value: "x2", rolling: false, effects: ["bless"], oneShot: true };
+    const state = makeDeck([bless, ...buildBaseDeck()], identityShuffle);
+    const d1 = draw(state, identityShuffle);
+    const d2 = draw(d1, identityShuffle);
+    expect(d2.recentDraws.map((c) => c.id)).toEqual(["b", d2.active[0]![0]!.id]);
+    expect(d2.discardPile.find((c) => c.id === "b")).toBeUndefined();
+  });
+
+  it("logs a whole rolling sequence and both advantage draws", () => {
+    const rolling: Card = { id: "r", value: 1, rolling: true, effects: [] };
+    const plain = buildBaseDeck().filter((c) => typeof c.value === "number");
+    const state = makeDeck([rolling, ...plain], identityShuffle);
+    const d1 = draw(state, identityShuffle); // rolling + next card
+    expect(d1.recentDraws).toHaveLength(2);
+    const d2 = drawAdvantage(d1, identityShuffle);
+    expect(d2.recentDraws).toHaveLength(4);
+  });
+
+  it("is cleared by a full reshuffle, kept by a draw-pile shuffle, rewound by undo", () => {
+    const state = makeDeck(buildBaseDeck(), identityShuffle);
+    const drawn = draw(draw(state, identityShuffle), identityShuffle);
+    expect(drawn.recentDraws).toHaveLength(2);
+    expect(reshuffleAll(drawn, identityShuffle).recentDraws).toEqual([]);
+    expect(reshuffleDrawPile(drawn, identityShuffle).recentDraws).toEqual(drawn.recentDraws);
+    const undone = undo(drawn);
+    expect(undone.recentDraws).toHaveLength(1);
+  });
+
+  it("is capped so persisted state stays bounded", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    for (let i = 0; i < 15; i++) s = draw(s, identityShuffle);
+    expect(s.recentDraws.length).toBeLessThanOrEqual(10);
+  });
+});
+
 describe("reshuffle", () => {
   it("combines draw and discard piles and clears needsShuffle", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
@@ -304,11 +341,11 @@ describe("reshuffle", () => {
     expect(r.needsShuffle).toBe(false);
   });
 
-  it("manual shuffles keep the last drawn cards on display", () => {
+  it("a full shuffle clears the display; shuffling only the draw pile keeps it", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const drawn = draw(state, identityShuffle);
     expect(drawn.active).toHaveLength(1);
-    expect(reshuffleAll(drawn, identityShuffle).active).toEqual(drawn.active);
+    expect(reshuffleAll(drawn, identityShuffle).active).toEqual([]);
     expect(reshuffleDrawPile(drawn, identityShuffle).active).toEqual(drawn.active);
   });
 });

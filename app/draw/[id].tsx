@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSequence,
+  withDelay,
+  runOnJS,
   Easing,
+  FadeIn,
+  LinearTransition,
 } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -37,6 +42,12 @@ const DRAW_COOLDOWN_MS = 1000;
 // the surrounding controls (the overlap/clipping bug on short screens).
 const CARD_LG_W = 260;
 const CARD_LG_H = 360;
+
+// Discard cascade: the last few previously drawn cards splay out behind the
+// current card, offset diagonally up-left so each one's corner value peeks out.
+const STACK_MAX = 3;
+const STACK_OFF_LG = 26;
+const STACK_OFF_MD = 18;
 
 // Map the just-drawn cards to a reveal flourish. x2/bless celebrate; miss/curse
 // get the negative effect; perk-added "deck modifier" cards (id `perk-*`) and
@@ -76,6 +87,8 @@ export default function DrawScreen() {
     tier: null,
     nonce: 0,
   });
+  const [toast, setToast] = useState<{ text: string; nonce: number } | null>(null);
+  const handleToastDone = useCallback(() => setToast(null), []);
   const cooldownFill = useSharedValue(1); // 1 = full / ready, 0 = just pressed
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -173,6 +186,17 @@ export default function DrawScreen() {
     if (hapticsEnabled) Haptics.selectionAsync();
     removeTempFromCharacter(character.id, value);
   };
+  // Shuffling the un-drawn pile changes nothing visible (counts and display
+  // stay the same), so confirm it happened with a haptic and a brief toast.
+  const handleShuffleUndrawn = () => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    shuffleDrawPile(character.id);
+    setToast((prev) => ({ text: t("draw.shuffledUndrawn"), nonce: (prev?.nonce ?? 0) + 1 }));
+  };
+  const handleShuffleAll = () => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    shuffleAll(character.id);
+  };
 
   const baseDrawLabel = mode === "normal" ? t("draw.drawBtn") : t("draw.drawTwice");
   const drawLabel = deck.needsShuffle ? t("draw.shuffleBtn") : baseDrawLabel;
@@ -184,11 +208,26 @@ export default function DrawScreen() {
   const undoable = canUndo(deck);
   const klass = findClass(character.classId);
   const portrait = CLASS_PORTRAITS[character.classId];
+
+  // The engine's recentDraws log is every card revealed by a draw, oldest
+  // first — including drawn bless/curse, which leave the piles immediately
+  // (one-shot) but still belong in the cascade. Minus the active cards (the
+  // front display), the tail of the log is the stack. Undo rewinds the log
+  // and a full shuffle clears it, so the display can't go stale.
+  const activeIds = new Set(sequences.flat().map((c) => c.id));
+  const stackCards = deck.recentDraws.filter((c) => !activeIds.has(c.id)).slice(-STACK_MAX);
+  const frontIsSingle = sequences.length === 1 && sequences[0]!.length === 1;
+  const stackExtent = frontIsSingle ? stackCards.length * STACK_OFF_LG : 0;
+
   const cardScale =
     cardArea.w && cardArea.h
       ? Math.max(
           0.5,
-          Math.min(1.5, (cardArea.w - 16) / CARD_LG_W, (cardArea.h - 16) / CARD_LG_H),
+          Math.min(
+            1.5,
+            (cardArea.w - 16) / (CARD_LG_W + stackExtent),
+            (cardArea.h - 16) / (CARD_LG_H + stackExtent),
+          ),
         )
       : 1;
 
@@ -235,18 +274,37 @@ export default function DrawScreen() {
           <Text style={styles.placeholder}>{t("draw.tapToDraw")}</Text>
         ) : sequences.length === 1 ? (
           <View style={{ transform: [{ scale: cardScale }] }}>
-            <SequenceView sequence={sequences[0]!} />
+            <View
+              // Reserved frame: the stack peeks up-left of the card, so give it
+              // room inside the scaled box instead of clipping at the cardArea.
+              style={
+                frontIsSingle && stackExtent > 0
+                  ? {
+                      width: CARD_LG_W + stackExtent,
+                      height: CARD_LG_H + stackExtent,
+                      alignItems: "flex-end",
+                      justifyContent: "flex-end",
+                    }
+                  : undefined
+              }
+            >
+              <CardStack cards={stackCards} size={frontIsSingle ? "lg" : "md"}>
+                <SequenceView sequence={sequences[0]!} />
+              </CardStack>
+            </View>
           </View>
         ) : (
           <View style={styles.twoUp}>
             {showAdvHint ? <Text style={styles.advHint}>{advLabel}</Text> : null}
-            <View style={styles.twoUpRow}>
-              {sequences.map((seq, i) => (
-                <View key={i} style={styles.twoUpCell}>
-                  <SequenceView sequence={seq} size="md" />
-                </View>
-              ))}
-            </View>
+            <CardStack cards={stackCards} size="md">
+              <View style={styles.twoUpRow}>
+                {sequences.map((seq, i) => (
+                  <View key={i} style={styles.twoUpCell}>
+                    <SequenceView sequence={seq} size="md" />
+                  </View>
+                ))}
+              </View>
+            </CardStack>
           </View>
         )}
       </View>
@@ -278,14 +336,14 @@ export default function DrawScreen() {
       <View style={styles.actions}>
         <Pressable
           style={[styles.action, deck.drawPile.length === 0 && styles.actionDisabled]}
-          onPress={() => shuffleDrawPile(character.id)}
+          onPress={handleShuffleUndrawn}
           disabled={deck.drawPile.length === 0}
         >
           <Text style={[styles.actionTxt, deck.drawPile.length === 0 && styles.actionTxtDisabled]}>
             {t("draw.shuffleUndrawn")}
           </Text>
         </Pressable>
-        <Pressable style={styles.action} onPress={() => shuffleAll(character.id)}>
+        <Pressable style={styles.action} onPress={handleShuffleAll}>
           <Text style={styles.actionTxt}>{t("draw.shuffleAll")}</Text>
         </Pressable>
         <Pressable style={styles.action} onPress={() => rebuildDeck(character.id)}>
@@ -299,6 +357,7 @@ export default function DrawScreen() {
         disabled={isCoolingDown}
         fill={cooldownFill}
       />
+      {toast ? <Toast text={toast.text} nonce={toast.nonce} onDone={handleToastDone} /> : null}
       </Bounded>
 
       <Modal
@@ -329,6 +388,34 @@ export default function DrawScreen() {
 
       <DrawEffects tier={effect.tier} nonce={effect.nonce} onDone={handleEffectDone} />
     </View>
+  );
+}
+
+// Brief self-dismissing confirmation pill shown above the draw button.
+function Toast({ text, nonce, onDone }: { text: string; nonce: number; onDone: () => void }) {
+  const fade = useSharedValue(0);
+  useEffect(() => {
+    fade.value = 0;
+    fade.value = withSequence(
+      withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) }),
+      withDelay(
+        900,
+        withTiming(0, { duration: 260, easing: Easing.in(Easing.cubic) }, (finished) => {
+          // Unmount once faded so the pill doesn't linger invisibly. A retrigger
+          // bumps `nonce`, cancels this timing (finished=false), and restarts.
+          if (finished) runOnJS(onDone)();
+        }),
+      ),
+    );
+  }, [nonce, fade, onDone]);
+  const style = useAnimatedStyle(() => ({
+    opacity: fade.value,
+    transform: [{ translateY: (1 - fade.value) * 8 }],
+  }));
+  return (
+    <Animated.View style={[styles.toast, style]} pointerEvents="none">
+      <Text style={styles.toastTxt}>{text}</Text>
+    </Animated.View>
   );
 }
 
@@ -444,6 +531,45 @@ function CountControl({
       >
         <Text style={txtStyle}>+</Text>
       </Pressable>
+    </View>
+  );
+}
+
+// Previously drawn cards splayed diagonally behind the current display, oldest
+// deepest. Each new draw shifts the others back a slot (animated by the layout
+// transition); keys are card ids so a card keeps its identity while sliding.
+function CardStack({
+  cards,
+  size,
+  children,
+}: {
+  cards: CardData[];
+  size: "lg" | "md";
+  children: ReactNode;
+}) {
+  const off = size === "lg" ? STACK_OFF_LG : STACK_OFF_MD;
+  const n = cards.length;
+  return (
+    <View>
+      {cards.map((c, i) => {
+        const depth = n - i;
+        return (
+          <Animated.View
+            key={c.id}
+            entering={FadeIn.duration(160)}
+            layout={LinearTransition.duration(200)}
+            style={{
+              position: "absolute",
+              top: -depth * off,
+              left: -depth * off,
+              opacity: 1 - depth * 0.12,
+            }}
+          >
+            <Card card={c} size={size} showCorner animateReveal={false} />
+          </Animated.View>
+        );
+      })}
+      {children}
     </View>
   );
 }
@@ -604,4 +730,16 @@ const styles = StyleSheet.create({
     transformOrigin: "left",
   },
   drawTxt: { color: "#0a0a0a", fontWeight: "800", fontSize: 22, letterSpacing: 2 },
+  toast: {
+    position: "absolute",
+    bottom: 104,
+    alignSelf: "center",
+    backgroundColor: "#1a1a1a",
+    borderColor: "#cbb26a",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  toastTxt: { color: "#cbb26a", fontWeight: "600", fontSize: 13, letterSpacing: 0.5 },
 });
