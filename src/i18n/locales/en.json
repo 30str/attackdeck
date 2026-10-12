@@ -49,6 +49,7 @@
     "curseLabel": "CURSE",
     "shuffleUndrawn": "Shuffle un-drawn",
     "shuffledUndrawn": "Un-drawn cards shuffled",
+    "deckReset": "Deck reset · Undo to restore",
     "shuffleAll": "Shuffle all",
     "drawBtn": "DRAW",
     "shuffleBtn": "SHUFFLE",

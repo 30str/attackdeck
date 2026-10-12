@@ -12,6 +12,7 @@ import Animated, {
   LinearTransition,
 } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useTranslation } from "react-i18next";
 import { Image } from "expo-image";
@@ -78,6 +79,7 @@ export default function DrawScreen() {
   const addTempToCharacter = useParty((s) => s.addTempToCharacter);
   const removeTempFromCharacter = useParty((s) => s.removeTempFromCharacter);
   const hapticsEnabled = useSettings((s) => s.hapticsEnabled);
+  const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<DrawMode>("normal");
   const [tempOpen, setTempOpen] = useState(false);
@@ -197,6 +199,13 @@ export default function DrawScreen() {
     if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     shuffleAll(character.id);
   };
+  // Reset is undoable, so no confirm dialog — the toast says how to get the
+  // deck back after an accidental tap.
+  const handleReset = () => {
+    if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    rebuildDeck(character.id);
+    setToast((prev) => ({ text: t("draw.deckReset"), nonce: (prev?.nonce ?? 0) + 1 }));
+  };
 
   const baseDrawLabel = mode === "normal" ? t("draw.drawBtn") : t("draw.drawTwice");
   const drawLabel = deck.needsShuffle ? t("draw.shuffleBtn") : baseDrawLabel;
@@ -233,7 +242,7 @@ export default function DrawScreen() {
 
   return (
     <View style={styles.root}>
-      <Bounded style={styles.inner}>
+      <Bounded style={[styles.inner, { paddingBottom: 16 + insets.bottom }]}>
       <View style={styles.top}>
         <View style={styles.nameRow}>
           {klass ? <ClassIcon klass={klass} size={36} /> : null}
@@ -346,7 +355,7 @@ export default function DrawScreen() {
         <Pressable style={styles.action} onPress={handleShuffleAll}>
           <Text style={styles.actionTxt}>{t("draw.shuffleAll")}</Text>
         </Pressable>
-        <Pressable style={styles.action} onPress={() => rebuildDeck(character.id)}>
+        <Pressable style={styles.action} onPress={handleReset}>
           <Text style={styles.actionTxt}>{t("common.reset")}</Text>
         </Pressable>
       </View>
@@ -357,7 +366,14 @@ export default function DrawScreen() {
         disabled={isCoolingDown}
         fill={cooldownFill}
       />
-      {toast ? <Toast text={toast.text} nonce={toast.nonce} onDone={handleToastDone} /> : null}
+      {toast ? (
+        <Toast
+          text={toast.text}
+          nonce={toast.nonce}
+          bottom={TOAST_BOTTOM + insets.bottom}
+          onDone={handleToastDone}
+        />
+      ) : null}
       </Bounded>
 
       <Modal
@@ -367,7 +383,7 @@ export default function DrawScreen() {
         onRequestClose={() => setTempOpen(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modal}>
+          <View style={[styles.modal, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={styles.modalTitle}>{t("draw.tempTitle")}</Text>
             <Text style={styles.modalBody}>{t("draw.tempBody")}</Text>
             {TEMP_CARD_VALUES.map((v) => (
@@ -392,7 +408,20 @@ export default function DrawScreen() {
 }
 
 // Brief self-dismissing confirmation pill shown above the draw button.
-function Toast({ text, nonce, onDone }: { text: string; nonce: number; onDone: () => void }) {
+// Offset from the bottom of the content column (before the safe-area inset).
+const TOAST_BOTTOM = 104;
+
+function Toast({
+  text,
+  nonce,
+  bottom,
+  onDone,
+}: {
+  text: string;
+  nonce: number;
+  bottom: number;
+  onDone: () => void;
+}) {
   const fade = useSharedValue(0);
   useEffect(() => {
     fade.value = 0;
@@ -413,7 +442,7 @@ function Toast({ text, nonce, onDone }: { text: string; nonce: number; onDone: (
     transform: [{ translateY: (1 - fade.value) * 8 }],
   }));
   return (
-    <Animated.View style={[styles.toast, style]} pointerEvents="none">
+    <Animated.View style={[styles.toast, { bottom }, style]} pointerEvents="none">
       <Text style={styles.toastTxt}>{text}</Text>
     </Animated.View>
   );
@@ -732,7 +761,6 @@ const styles = StyleSheet.create({
   drawTxt: { color: "#0a0a0a", fontWeight: "800", fontSize: 22, letterSpacing: 2 },
   toast: {
     position: "absolute",
-    bottom: 104,
     alignSelf: "center",
     backgroundColor: "#1a1a1a",
     borderColor: "#cbb26a",

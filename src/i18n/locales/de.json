@@ -48,6 +48,7 @@
     "curseLabel": "FLUCH",
     "shuffleUndrawn": "Stapel mischen",
     "shuffledUndrawn": "Stapel gemischt",
+    "deckReset": "Stapel zurückgesetzt · Rückgängig möglich",
     "shuffleAll": "Alles mischen",
     "drawBtn": "ZIEHEN",
     "shuffleBtn": "MISCHEN",

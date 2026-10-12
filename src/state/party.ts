@@ -5,6 +5,7 @@ import { findClass, buildBaseDeck } from "../data";
 import {
   applyPerks,
   makeDeck,
+  resetDeck,
   draw,
   drawAdvantage,
   undo,
@@ -59,11 +60,14 @@ function newCharacterId(): string {
 // plenty; a live session still gets the full stack.
 const PERSISTED_HISTORY = 10;
 
-function rebuild(character: Character): DeckState {
+function deckCards(character: Character) {
   const klass = findClass(character.classId);
   const base = klass?.startingDeck === "base" || !klass ? buildBaseDeck() : klass.startingDeck;
-  const cards = applyPerks(base, klass?.perks ?? [], character.perkCounts);
-  return makeDeck(cards);
+  return applyPerks(base, klass?.perks ?? [], character.perkCounts);
+}
+
+function rebuild(character: Character): DeckState {
+  return makeDeck(deckCards(character));
 }
 
 export const useParty = create<PartyState>()(
@@ -103,6 +107,9 @@ export const useParty = create<PartyState>()(
             if (c.id !== id) return c;
             const current = c.perkCounts[perkId] ?? 0;
             const next = Math.max(0, current + delta);
+            // A no-op toggle (− at zero) must not rebuild: that would silently
+            // wipe bless/curse/temp cards, the drawn state and the undo stack.
+            if (next === current) return c;
             const perkCounts = { ...c.perkCounts, [perkId]: next };
             const updated: Character = { ...c, perkCounts };
             return { ...updated, deck: rebuild(updated) };
@@ -110,10 +117,12 @@ export const useParty = create<PartyState>()(
         });
       },
 
+      // Undoable: perks haven't changed, so the pre-reset history is still
+      // valid and an accidental Reset can be walked back.
       rebuildDeck: (id) => {
         set({
           characters: get().characters.map((c) =>
-            c.id === id ? { ...c, deck: rebuild(c) } : c
+            c.id === id ? { ...c, deck: resetDeck(c.deck, deckCards(c)) } : c
           ),
         });
       },

@@ -19,6 +19,7 @@ import {
   addTempCard,
   removeTempCard,
   countTemp,
+  resetDeck,
   type ShuffleFn,
 } from "./deck";
 import type { Card, Perk } from "../data/types";
@@ -611,5 +612,76 @@ describe("temp cards", () => {
     const removed = removeTempCard(s, 2, identityShuffle);
     expect(countTemp(removed, 2)).toBe(0);
     expect(countTemp(undo(removed), 2)).toBe(1);
+  });
+});
+
+describe("pile exhausted mid-draw", () => {
+  const plain = (id: string, value: number): Card => ({ id, value, rolling: false, effects: [] });
+  const rolling = (id: string): Card => ({ id, value: 0, rolling: true, effects: ["push"] });
+
+  it("a rolling sequence never redraws a card it already revealed", () => {
+    // Draw pile: one rolling card. Discard: one plain card. The rolling card
+    // empties the pile, so the discard is shuffled in — the rolling card is in
+    // play and must not be part of that shuffle.
+    const state = {
+      ...makeDeck([], identityShuffle),
+      drawPile: [rolling("r")],
+      discardPile: [plain("d", 1)],
+    };
+    const after = draw(state, identityShuffle);
+    expect(after.active[0]!.map((c) => c.id)).toEqual(["r", "d"]);
+    expect(after.drawPile).toEqual([]);
+    expect(after.discardPile.map((c) => c.id).sort()).toEqual(["d", "r"]);
+  });
+
+  it("advantage's second draw never redraws the first draw's card", () => {
+    const state = {
+      ...makeDeck([], identityShuffle),
+      drawPile: [plain("a", 1)],
+      discardPile: [plain("b", -1)],
+    };
+    const after = drawAdvantage(state, identityShuffle);
+    expect(after.active.map((seq) => seq.map((c) => c.id))).toEqual([["a"], ["b"]]);
+    expect(after.discardPile.map((c) => c.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("stops short instead of crashing when every card is in play", () => {
+    const state = { ...makeDeck([], identityShuffle), drawPile: [rolling("r")] };
+    const after = draw(state, identityShuffle);
+    expect(after.active[0]!.map((c) => c.id)).toEqual(["r"]);
+    expect(after.discardPile.map((c) => c.id)).toEqual(["r"]);
+  });
+});
+
+describe("resetDeck", () => {
+  it("restores a fresh deck but keeps the undo stack", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addBless(s, identityShuffle);
+    s = draw(s, identityShuffle);
+    const before = s;
+    const reset = resetDeck(s, buildBaseDeck(), identityShuffle);
+    expect(reset.drawPile).toHaveLength(20);
+    expect(reset.discardPile).toEqual([]);
+    expect(reset.active).toEqual([]);
+    expect(reset.recentDraws).toEqual([]);
+    expect(countBless(reset)).toBe(0);
+
+    const undone = undo(reset);
+    expect(undone.drawPile).toEqual(before.drawPile);
+    expect(undone.discardPile).toEqual(before.discardPile);
+    expect(undone.active).toEqual(before.active);
+    expect(undone.history).toHaveLength(before.history.length);
+  });
+});
+
+describe("card ids", () => {
+  it("are unique and tagged per launch so they can't collide with saved cards", () => {
+    let s = makeDeck(buildBaseDeck(), identityShuffle);
+    s = addBless(s, identityShuffle);
+    s = addBless(s, identityShuffle);
+    const ids = s.drawPile.filter((c) => c.id.startsWith("bless-")).map((c) => c.id);
+    expect(new Set(ids).size).toBe(2);
+    // A bare-counter id like "bless-1" from an earlier session can't match.
+    for (const id of ids) expect(id).toMatch(/^bless-[0-9a-z]+-\d+$/);
   });
 });

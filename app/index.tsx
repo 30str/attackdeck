@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useState } from "react";
 import { View, Text, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, Modal } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { useParty, type Character } from "@/src/state/party";
 import { useSettings } from "@/src/state/settings";
@@ -26,6 +27,7 @@ export default function PartyScreen() {
   const removeCharacter = useParty((s) => s.removeCharacter);
   const unlockedClasses = useSettings((s) => s.unlockedClasses);
   const unlock = useSettings((s) => s.unlock);
+  const insets = useSafeAreaInsets();
 
   const [addOpen, setAddOpen] = useState(false);
   const [step, setStep] = useState<"class" | "name">("class");
@@ -186,7 +188,9 @@ export default function PartyScreen() {
         <FlatList
           data={characters}
           keyExtractor={(c) => c.id}
-          contentContainerStyle={styles.list}
+          // Bottom padding clears the floating Add button so the last row
+          // can scroll out from under it.
+          contentContainerStyle={[styles.list, { paddingBottom: 120 + insets.bottom }]}
           extraData={pendingDeleteId}
           renderItem={({ item }) => (
             <CharacterRow
@@ -201,7 +205,7 @@ export default function PartyScreen() {
         />
       )}
 
-      <View style={styles.fabBar} pointerEvents="box-none">
+      <View style={[styles.fabBar, { bottom: 24 + insets.bottom }]} pointerEvents="box-none">
         <Pressable
           style={styles.fab}
           onPress={() => {
@@ -221,7 +225,7 @@ export default function PartyScreen() {
           style={styles.modalBackdrop}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <View style={styles.modal}>
+          <View style={[styles.modal, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={styles.modalTitle}>{t("party.newCharacter")}</Text>
             {step === "class" ? (
               <>
@@ -446,7 +450,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 24,
     paddingHorizontal: 16,
     alignItems: "center",
   },

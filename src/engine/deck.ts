@@ -16,8 +16,9 @@ export type DeckSnapshot = {
 export type DeckState = DeckSnapshot & {
   // Undo stack: snapshots of prior states, oldest first. Every mutating op
   // pushes the pre-op state; undo() pops the most recent. Cleared only by a
-  // full rebuild (makeDeck), so undo walks all the way back to the deck's
-  // start. Capped to keep the persisted state bounded over a long session.
+  // full rebuild (makeDeck, on perk changes), so undo walks all the way back
+  // to the deck's start — including across a resetDeck. Capped to keep the
+  // persisted state bounded over a long session.
   history: DeckSnapshot[];
 };
 
@@ -74,10 +75,17 @@ function shufflesOnDraw(card: Card): boolean {
 
 type DrawResult = {
   drawPile: Card[];
+  // Excludes the cards in `sequence`: they're in play until the whole draw
+  // resolves, so the caller adds them to the discard afterwards.
   discardPile: Card[];
   sequence: Card[];
   needsShuffle: boolean;
 };
+
+// Cards that go to the discard once played (one-shots leave the game).
+function discarded(sequence: readonly Card[]): Card[] {
+  return sequence.filter((c) => !c.oneShot);
+}
 
 function drawOnce(
   drawPile: Card[],
@@ -97,15 +105,15 @@ function drawOnce(
 
   while (true) {
     if (pile.length === 0) {
+      // The pile ran dry mid-sequence: shuffle the discard back in. Cards in
+      // play aren't in `discard` yet, so the same card can't come up twice.
+      // If nothing is left at all (every card is in play), stop short.
+      if (discard.length === 0) break;
       pile = shuffle(discard);
       discard = [];
     }
     const card = pile.shift()!;
     sequence.push(card);
-
-    if (!card.oneShot) {
-      discard.push(card);
-    }
 
     if (shufflesOnDraw(card)) {
       needsShuffle = true;
@@ -123,7 +131,7 @@ export function draw(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckSt
   const result = drawOnce(state.drawPile, state.discardPile, state.needsShuffle, shuffle);
   return pushHistory(state, {
     drawPile: result.drawPile,
-    discardPile: result.discardPile,
+    discardPile: result.discardPile.concat(discarded(result.sequence)),
     active: [result.sequence],
     recentDraws: state.recentDraws.concat(result.sequence).slice(-MAX_RECENT_DRAWS),
     needsShuffle: result.needsShuffle,
@@ -134,11 +142,12 @@ export function drawAdvantage(state: DeckState, shuffle: ShuffleFn = fisherYates
   const first = drawOnce(state.drawPile, state.discardPile, state.needsShuffle, shuffle);
   // Both advantage draws happen before any shuffle (shuffle is end-of-round per
   // the Gloomhaven rule). Pass needsShuffleAtStart=false so the second draw
-  // doesn't reshuffle just because the first one revealed miss or x2.
+  // doesn't reshuffle just because the first one revealed miss or x2. The
+  // first sequence stays in play (out of the discard) during the second draw.
   const second = drawOnce(first.drawPile, first.discardPile, false, shuffle);
   return pushHistory(state, {
     drawPile: second.drawPile,
-    discardPile: second.discardPile,
+    discardPile: second.discardPile.concat(discarded(first.sequence), discarded(second.sequence)),
     active: [first.sequence, second.sequence],
     recentDraws: state.recentDraws
       .concat(first.sequence, second.sequence)
@@ -165,6 +174,24 @@ export function reshuffle(state: DeckState, shuffle: ShuffleFn = fisherYates): D
   const combined = state.drawPile.concat(state.discardPile);
   return pushHistory(state, {
     drawPile: shuffle(combined),
+    discardPile: [],
+    active: [],
+    recentDraws: [],
+    needsShuffle: false,
+  });
+}
+
+// Replace the deck's contents with a freshly shuffled `cards` (the store's
+// reset path), keeping the undo stack so an accidental reset can be undone.
+// Perk toggles use makeDeck instead: their history would restore a deck
+// built from different perks.
+export function resetDeck(
+  state: DeckState,
+  cards: readonly Card[],
+  shuffle: ShuffleFn = fisherYates
+): DeckState {
+  return pushHistory(state, {
+    drawPile: shuffle(cards),
     discardPile: [],
     active: [],
     recentDraws: [],
@@ -208,10 +235,14 @@ function cardMatchesSpec(card: Card, spec: CardSpec): boolean {
   return wantEffects.every((e, i) => e === haveEffects[i]);
 }
 
+// The counter restarts on every launch, but cards created in an earlier
+// session are still in persisted decks — the per-launch tag keeps a new
+// `bless-1` from colliding with a saved one.
+const SESSION_TAG = Date.now().toString(36);
 let cardSeq = 0;
 function cardId(prefix: string): string {
   cardSeq += 1;
-  return `${prefix}-${cardSeq}`;
+  return `${prefix}-${SESSION_TAG}-${cardSeq}`;
 }
 
 function specToCard(spec: CardSpec, prefix = "perk"): Card {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { useParty } from "@/src/state/party";
 import { findClass } from "@/src/data";
@@ -15,6 +16,7 @@ export default function CharacterScreen() {
   const renameCharacter = useParty((s) => s.renameCharacter);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const insets = useSafeAreaInsets();
 
   if (!character) {
     return (
@@ -46,7 +48,10 @@ export default function CharacterScreen() {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: 120 + insets.bottom }]}
+        keyboardShouldPersistTaps="handled"
+      >
         {editingName ? (
           <TextInput
             value={draftName}
@@ -92,8 +97,9 @@ export default function CharacterScreen() {
                 <Pressable
                   style={styles.counterBtn}
                   onPress={() => togglePerk(character.id, perk.id, -1)}
+                  disabled={applied <= 0}
                 >
-                  <Text style={styles.counterTxt}>−</Text>
+                  <Text style={[styles.counterTxt, applied <= 0 && styles.disabled]}>−</Text>
                 </Pressable>
                 <Pressable
                   style={styles.counterBtn}
@@ -114,7 +120,7 @@ export default function CharacterScreen() {
         </Pressable>
       </ScrollView>
 
-      <View style={styles.fabBar} pointerEvents="box-none">
+      <View style={[styles.fabBar, { bottom: 24 + insets.bottom }]} pointerEvents="box-none">
         <Pressable style={styles.fab} onPress={() => router.push(`/draw/${character.id}`)}>
           <Text style={styles.fabTxt}>{t("character.openDraw")}</Text>
         </Pressable>
@@ -125,7 +131,7 @@ export default function CharacterScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0a0a0a" },
-  scroll: { padding: 16, paddingBottom: 120, gap: 8, width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
+  scroll: { padding: 16, gap: 8, width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
   empty: { color: "#888", padding: 24 },
   heading: { color: "#f5f5f5", fontSize: 28, fontWeight: "700" },
   headingRow: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -180,7 +186,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 24,
     paddingHorizontal: 16,
     alignItems: "center",
   },
