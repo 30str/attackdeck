@@ -12,6 +12,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 import type { Card as CardData } from "../data/types";
+import { CARD_W, CARD_H } from "./cardLayout";
 
 // Effect tags that have a translation entry under "effects.<key>".
 // Filtering here keeps unknown effects from rendering as a key-string.
@@ -29,7 +30,10 @@ const RENDERED_EFFECTS = new Set<string>([
 
 export type CardProps = {
   card: CardData;
-  size?: "lg" | "md";
+  /** Multiplier on the native CARD_W × CARD_H design. Labels have a minimum
+   * size so a small card (wrapped rolling chain, advantage pair) stays
+   * readable instead of shrinking its text proportionally. */
+  scale?: number;
   /** Playing-card style value index in the top-left corner, so the card stays
    * readable when splayed behind another card in the discard stack. */
   showCorner?: boolean;
@@ -53,9 +57,19 @@ function bgFor(card: CardData): string {
   return "#1a1a1a";
 }
 
-export function Card({ card, size = "lg", showCorner = false, animateReveal = true }: CardProps) {
+export function Card({ card, scale = 1, showCorner = false, animateReveal = true }: CardProps) {
   const { t } = useTranslation();
-  const dim = size === "lg" ? styles.lg : styles.md;
+  const s = scale;
+  const label = formatValue(card.value);
+  // Word values ("MISS") get an explicit smaller size: adjustsFontSizeToFit
+  // is ignored on web and unreliable on Android, which left "MI…" ellipsis.
+  const valueSize = (label.length > 2 ? 52 : 96) * s;
+  const dim = {
+    width: CARD_W * s,
+    height: CARD_H * s,
+    borderRadius: Math.max(8, 14 * s),
+    padding: Math.max(6, 16 * s),
+  };
   const flip = useSharedValue(animateReveal ? 0 : 1);
   const glow = useSharedValue(0);
 
@@ -89,36 +103,48 @@ export function Card({ card, size = "lg", showCorner = false, animateReveal = tr
   return (
     <Animated.View style={[styles.card, dim, { backgroundColor: bgFor(card) }, animatedStyle]}>
       {showCorner ? (
-        <Text style={[styles.corner, size === "lg" ? styles.cornerLg : styles.cornerMd]}>
-          {`${card.rolling ? "↻" : ""}${formatValue(card.value)}`}
+        <Text
+          style={[
+            styles.corner,
+            { top: 6 * s, left: 9 * s, fontSize: Math.max(10, 15 * s) },
+          ]}
+        >
+          {`${card.rolling ? "↻" : ""}${label}`}
         </Text>
       ) : null}
-      {card.rolling ? <Text style={styles.rolling}>↻ ROLLING</Text> : null}
+      {card.rolling ? (
+        <Text
+          style={[
+            styles.rolling,
+            { fontSize: Math.max(9, 12 * s), letterSpacing: s < 0.6 ? 1 : 2, marginBottom: 8 * s },
+          ]}
+          numberOfLines={1}
+        >
+          {/* The word no longer fits on the smallest cards (long rolling
+              chains in advantage); the glyph alone still reads. */}
+          {s < 0.3 ? "↻" : "↻ ROLLING"}
+        </Text>
+      ) : null}
       <Text
-        // Word values ("MISS") get an explicit smaller size: adjustsFontSizeToFit
-        // is ignored on web and unreliable on Android, which left "MI…" ellipsis.
-        style={[
-          styles.value,
-          size === "lg"
-            ? formatValue(card.value).length > 2
-              ? styles.valueLgLong
-              : styles.valueLg
-            : formatValue(card.value).length > 2
-              ? styles.valueMdLong
-              : styles.valueMd,
-        ]}
+        style={[styles.value, { fontSize: valueSize }]}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.4}
       >
-        {formatValue(card.value)}
+        {label}
       </Text>
       {card.effects.length > 0 ? (
-        <View style={styles.effects}>
+        <View style={[styles.effects, { marginTop: 12 * s }]}>
           {card.effects
             .filter((e) => RENDERED_EFFECTS.has(e))
             .map((e) => (
-              <Text key={e} style={styles.effect}>
+              <Text
+                key={e}
+                style={[
+                  styles.effect,
+                  { fontSize: Math.max(9, 11 * s), letterSpacing: s < 0.6 ? 0.5 : 1.5 },
+                ]}
+              >
                 {t(`effects.${e}`)}
               </Text>
             ))}
@@ -130,34 +156,18 @@ export function Card({ card, size = "lg", showCorner = false, animateReveal = tr
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 14,
     borderWidth: 2,
     borderColor: "#2a2a2a",
-    padding: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  lg: { width: 260, height: 360 },
-  md: { width: 90, height: 130 },
-  rolling: {
-    color: "#cbb26a",
-    fontSize: 12,
-    letterSpacing: 2,
-    marginBottom: 8,
-  },
+  rolling: { color: "#cbb26a" },
   corner: { position: "absolute", color: "#f5f5f5", fontWeight: "800" },
-  cornerLg: { top: 6, left: 9, fontSize: 15 },
-  cornerMd: { top: 3, left: 6, fontSize: 11 },
   value: {
     color: "#f5f5f5",
     fontWeight: "700",
   },
-  valueLg: { fontSize: 96 },
-  valueLgLong: { fontSize: 52 },
-  valueMd: { fontSize: 32 },
-  valueMdLong: { fontSize: 17 },
   effects: {
-    marginTop: 12,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
@@ -165,8 +175,6 @@ const styles = StyleSheet.create({
   },
   effect: {
     color: "#cbb26a",
-    fontSize: 11,
-    letterSpacing: 1.5,
     borderColor: "#3a3a3a",
     borderWidth: 1,
     paddingHorizontal: 6,

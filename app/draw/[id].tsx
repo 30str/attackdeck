@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, Pressable, StyleSheet, Modal } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,6 +22,7 @@ import { Card } from "@/src/components/Card";
 import { Bounded, CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
 import { DrawEffects, type EffectTier } from "@/src/components/DrawEffects";
 import { ClassIcon } from "@/src/components/ClassIcon";
+import { layoutDraw, CARD_W, CARD_H } from "@/src/components/cardLayout";
 import {
   countBless,
   countCurse,
@@ -38,17 +39,14 @@ type DrawMode = "normal" | "advantage" | "disadvantage";
 
 const DRAW_COOLDOWN_MS = 1000;
 
-// Native footprint of a large card — must match Card.tsx's `lg` style.
-// The card is scaled to fit its measured area so it never overflows onto
-// the surrounding controls (the overlap/clipping bug on short screens).
-const CARD_LG_W = 260;
-const CARD_LG_H = 360;
-
 // Discard cascade: the last few previously drawn cards splay out behind the
 // current card, offset diagonally up-left so each one's corner value peeks out.
 const STACK_MAX = 3;
-const STACK_OFF_LG = 26;
-const STACK_OFF_MD = 18;
+
+// Breathing room inside the card area, and the space the "pick the better
+// card" hint takes above an advantage pair.
+const CARD_AREA_INSET = 16;
+const ADV_HINT_H = 30;
 
 // Map the just-drawn cards to a reveal flourish. x2/bless celebrate; miss/curse
 // get the negative effect; perk-added "deck modifier" cards (id `perk-*`) and
@@ -222,23 +220,33 @@ export default function DrawScreen() {
   // first — including drawn bless/curse, which leave the piles immediately
   // (one-shot) but still belong in the cascade. Minus the active cards (the
   // front display), the tail of the log is the stack. Undo rewinds the log
-  // and a full shuffle clears it, so the display can't go stale.
-  const activeIds = new Set(sequences.flat().map((c) => c.id));
-  const stackCards = deck.recentDraws.filter((c) => !activeIds.has(c.id)).slice(-STACK_MAX);
-  const frontIsSingle = sequences.length === 1 && sequences[0]!.length === 1;
-  const stackExtent = frontIsSingle ? stackCards.length * STACK_OFF_LG : 0;
+  // and a full shuffle clears it, so the display can't go stale. A card can
+  // appear in the log twice (the pile ran dry and reshuffled mid-round), so
+  // keep only its latest reveal — ids double as React keys.
+  const seenIds = new Set(sequences.flat().map((c) => c.id));
+  const stackCards: CardData[] = [];
+  for (let i = deck.recentDraws.length - 1; i >= 0 && stackCards.length < STACK_MAX; i--) {
+    const c = deck.recentDraws[i]!;
+    if (seenIds.has(c.id)) continue;
+    seenIds.add(c.id);
+    stackCards.unshift(c);
+  }
 
-  const cardScale =
-    cardArea.w && cardArea.h
-      ? Math.max(
-          0.5,
-          Math.min(
-            1.5,
-            (cardArea.w - 16) / (CARD_LG_W + stackExtent),
-            (cardArea.h - 16) / (CARD_LG_H + stackExtent),
-          ),
+  // Every card — single draw, rolling chain, advantage pair, cascade — is
+  // sized and placed from the measured area, so nothing overflows onto the
+  // controls and an advantage pair gets the space a single card would. Until
+  // the first onLayout arrives, assume room for one native-size card so the
+  // draw is never invisible.
+  const area = cardArea.w && cardArea.h ? cardArea : { w: CARD_W + CARD_AREA_INSET, h: CARD_H + CARD_AREA_INSET };
+  const layout =
+    sequences.length > 0
+      ? layoutDraw(
+          sequences.map((seq) => seq.length),
+          stackCards.length,
+          area.w - CARD_AREA_INSET,
+          area.h - CARD_AREA_INSET - (showAdvHint ? ADV_HINT_H : 0),
         )
-      : 1;
+      : null;
 
   return (
     <View style={styles.root}>
@@ -281,41 +289,54 @@ export default function DrawScreen() {
         ) : null}
         {sequences.length === 0 ? (
           <Text style={styles.placeholder}>{t("draw.tapToDraw")}</Text>
-        ) : sequences.length === 1 ? (
-          <View style={{ transform: [{ scale: cardScale }] }}>
-            <View
-              // Reserved frame: the stack peeks up-left of the card, so give it
-              // room inside the scaled box instead of clipping at the cardArea.
-              style={
-                frontIsSingle && stackExtent > 0
-                  ? {
-                      width: CARD_LG_W + stackExtent,
-                      height: CARD_LG_H + stackExtent,
-                      alignItems: "flex-end",
-                      justifyContent: "flex-end",
-                    }
-                  : undefined
-              }
-            >
-              <CardStack cards={stackCards} size={frontIsSingle ? "lg" : "md"}>
-                <SequenceView sequence={sequences[0]!} />
-              </CardStack>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.twoUp}>
+        ) : layout ? (
+          <>
             {showAdvHint ? <Text style={styles.advHint}>{advLabel}</Text> : null}
-            <CardStack cards={stackCards} size="md">
-              <View style={styles.twoUpRow}>
-                {sequences.map((seq, i) => (
-                  <View key={i} style={styles.twoUpCell}>
-                    <SequenceView sequence={seq} size="md" />
+            <View style={{ width: layout.width, height: layout.height }}>
+              {layout.dividers.map((x, i) => (
+                <View
+                  key={`divider-${i}`}
+                  style={[
+                    styles.divider,
+                    { left: x - 0.5, top: layout.top, height: layout.height - layout.top },
+                  ]}
+                />
+              ))}
+              {stackCards.map((c, i) => (
+                // Keyed by card id so a card keeps its identity while sliding
+                // back a slot on each new draw (the layout transition).
+                <Animated.View
+                  key={`stack-${c.id}`}
+                  entering={FadeIn.duration(160)}
+                  layout={LinearTransition.duration(200)}
+                  style={[
+                    styles.placed,
+                    {
+                      left: layout.stack[i]!.x,
+                      top: layout.stack[i]!.y,
+                      opacity: 1 - (stackCards.length - i) * 0.12,
+                    },
+                  ]}
+                >
+                  <Card card={c} scale={layout.scale} showCorner animateReveal={false} />
+                </Animated.View>
+              ))}
+              {sequences.map((seq, si) =>
+                seq.map((c, ci) => (
+                  <View
+                    key={`front-${c.id}`}
+                    style={[
+                      styles.placed,
+                      { left: layout.sequences[si]![ci]!.x, top: layout.sequences[si]![ci]!.y },
+                    ]}
+                  >
+                    <Card card={c} scale={layout.scale} />
                   </View>
-                ))}
-              </View>
-            </CardStack>
-          </View>
-        )}
+                )),
+              )}
+            </View>
+          </>
+        ) : null}
       </View>
 
       <View style={styles.actions}>
@@ -564,63 +585,6 @@ function CountControl({
   );
 }
 
-// Previously drawn cards splayed diagonally behind the current display, oldest
-// deepest. Each new draw shifts the others back a slot (animated by the layout
-// transition); keys are card ids so a card keeps its identity while sliding.
-function CardStack({
-  cards,
-  size,
-  children,
-}: {
-  cards: CardData[];
-  size: "lg" | "md";
-  children: ReactNode;
-}) {
-  const off = size === "lg" ? STACK_OFF_LG : STACK_OFF_MD;
-  const n = cards.length;
-  return (
-    <View>
-      {cards.map((c, i) => {
-        const depth = n - i;
-        return (
-          <Animated.View
-            key={c.id}
-            entering={FadeIn.duration(160)}
-            layout={LinearTransition.duration(200)}
-            style={{
-              position: "absolute",
-              top: -depth * off,
-              left: -depth * off,
-              opacity: 1 - depth * 0.12,
-            }}
-          >
-            <Card card={c} size={size} showCorner animateReveal={false} />
-          </Animated.View>
-        );
-      })}
-      {children}
-    </View>
-  );
-}
-
-function SequenceView({ sequence, size = "lg" }: { sequence: CardData[]; size?: "lg" | "md" }) {
-  if (sequence.length === 0) return null;
-  if (sequence.length === 1) {
-    return <Card card={sequence[0]!} size={size} />;
-  }
-  return (
-    <ScrollView
-      horizontal
-      contentContainerStyle={styles.rolling}
-      showsHorizontalScrollIndicator={false}
-    >
-      {sequence.map((c) => (
-        <Card key={c.id} card={c} size="md" />
-      ))}
-    </ScrollView>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0a0a0a" },
   inner: { flex: 1, padding: 16 },
@@ -644,10 +608,8 @@ const styles = StyleSheet.create({
     opacity: 0.22,
   },
   placeholder: { color: "#444", fontSize: 16 },
-  rolling: { gap: 8, paddingHorizontal: 8, alignItems: "center" },
-  twoUp: { flex: 1, justifyContent: "center", alignItems: "center", width: "100%" },
-  twoUpRow: { flexDirection: "row", gap: 12, alignItems: "center", justifyContent: "center" },
-  twoUpCell: { alignItems: "center", justifyContent: "center" },
+  placed: { position: "absolute" },
+  divider: { position: "absolute", width: 1, backgroundColor: "#cbb26a", opacity: 0.35 },
   advHint: { color: "#cbb26a", fontSize: 12, letterSpacing: 1.5, marginBottom: 12 },
   actions: { flexDirection: "row", gap: 8, marginBottom: 8 },
   blessTxt: { color: "#cbb26a", fontWeight: "700" },
