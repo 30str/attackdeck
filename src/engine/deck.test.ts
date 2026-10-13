@@ -56,9 +56,9 @@ describe("draw", () => {
     const cards = buildBaseDeck();
     const state = makeDeck(cards, identityShuffle);
     const after = draw(state, identityShuffle);
-    expect(after.active).toHaveLength(1);
-    expect(after.active[0]).toHaveLength(1);
-    expect(after.active[0]![0]).toEqual(cards[0]);
+    expect(after.active!.options).toHaveLength(1);
+    expect(after.active!.options[0]).toHaveLength(1);
+    expect(after.active!.options[0]![0]).toEqual(cards[0]);
     expect(after.drawPile).toHaveLength(19);
     expect(after.discardPile).toHaveLength(1);
   });
@@ -70,7 +70,7 @@ describe("draw", () => {
     ];
     const state = makeDeck(missFirst, identityShuffle);
     const after = draw(state, identityShuffle);
-    expect(after.active[0]![0]!.value).toBe("miss");
+    expect(after.active!.options[0]![0]!.value).toBe("miss");
     expect(after.needsShuffle).toBe(true);
   });
 
@@ -81,11 +81,13 @@ describe("draw", () => {
     ];
     const state = makeDeck(x2First, identityShuffle);
     const after = draw(state, identityShuffle);
-    expect(after.active[0]![0]!.value).toBe("x2");
+    expect(after.active!.options[0]![0]!.value).toBe("x2");
     expect(after.needsShuffle).toBe(true);
   });
 
-  it("reshuffles before drawing if needsShuffle is set", () => {
+  it("keeps drawing from the remaining pile while a shuffle is pending", () => {
+    // The shuffle is end-of-round: a second attack in the same round draws
+    // the next card, it doesn't reshuffle the x2 back in first.
     const x2First = [
       { id: "x", value: "x2" as const, rolling: false, effects: [] },
       ...buildBaseDeck().filter((c) => c.value !== "x2"),
@@ -94,8 +96,39 @@ describe("draw", () => {
     const afterX2 = draw(state, identityShuffle);
     expect(afterX2.needsShuffle).toBe(true);
     const afterNext = draw(afterX2, identityShuffle);
-    expect(afterNext.needsShuffle).toBe(false);
-    expect(countCards(afterNext)).toBe(20);
+    expect(afterNext.active!.options[0]![0]).toEqual(x2First[1]);
+    expect(afterNext.drawPile).toHaveLength(18);
+    expect(afterNext.discardPile).toHaveLength(2);
+    // Still pending until the player reshuffles at end of round.
+    expect(afterNext.needsShuffle).toBe(true);
+    const shuffled = reshuffleAll(afterNext, identityShuffle);
+    expect(shuffled.needsShuffle).toBe(false);
+    expect(countCards(shuffled)).toBe(20);
+  });
+
+  it("keeps a pending shuffle through an advantage draw", () => {
+    const x2First = [
+      { id: "x", value: "x2" as const, rolling: false, effects: [] },
+      ...buildBaseDeck().filter((c) => c.value !== "x2" && c.value !== "miss"),
+    ];
+    const afterX2 = draw(makeDeck(x2First, identityShuffle), identityShuffle);
+    const after = drawAdvantage(afterX2, { kind: "advantage", rules: "gh" }, identityShuffle);
+    expect(after.drawPile).toHaveLength(x2First.length - 3);
+    expect(after.needsShuffle).toBe(true);
+  });
+
+  it("reshuffles the discard immediately when the pile is empty", () => {
+    const cards: Card[] = [
+      { id: "a", value: 1, rolling: false, effects: [] },
+      { id: "b", value: 0, rolling: false, effects: [] },
+    ];
+    let state = makeDeck(cards, identityShuffle);
+    state = draw(state, identityShuffle);
+    state = draw(state, identityShuffle);
+    expect(state.drawPile).toHaveLength(0);
+    state = draw(state, identityShuffle);
+    expect(state.active!.options[0]![0]!.id).toBe("a");
+    expect(countCards(state)).toBe(2);
   });
 });
 
@@ -112,55 +145,108 @@ describe("rolling modifiers", () => {
     const cards = [rolling(0), rolling(1), final, ...filler];
     const state = makeDeck(cards, identityShuffle);
     const after = draw(state, identityShuffle);
-    expect(after.active).toHaveLength(1);
-    expect(after.active[0]).toHaveLength(3);
-    expect(after.active[0]!.map((c) => c.rolling)).toEqual([true, true, false]);
+    expect(after.active!.options).toHaveLength(1);
+    expect(after.active!.options[0]).toHaveLength(3);
+    expect(after.active!.options[0]!.map((c) => c.rolling)).toEqual([true, true, false]);
   });
 });
 
 describe("drawAdvantage", () => {
-  it("draws two sequences as one atomic operation", () => {
-    const cards = buildBaseDeck();
-    const state = makeDeck(cards, identityShuffle);
-    const after = drawAdvantage(state, identityShuffle);
-    expect(after.active).toHaveLength(2);
-    expect(after.active[0]).toHaveLength(1);
-    expect(after.active[1]).toHaveLength(1);
-    expect(after.drawPile).toHaveLength(18);
-    expect(after.discardPile).toHaveLength(2);
+  const plain = (id: string, value: number): Card => ({ id, value, rolling: false, effects: [] });
+  const roll = (id: string): Card => ({ id, value: 1, rolling: true, effects: ["fire"] });
+  // Top of the deck in order, then filler so nothing runs dry.
+  const deckOf = (...top: Card[]) =>
+    makeDeck([...top, ...buildBaseDeck().filter((c) => typeof c.value === "number")], identityShuffle);
+  const ids = (cards: readonly Card[]) => cards.map((c) => c.id);
+  const optionIds = (s: ReturnType<typeof makeDeck>) => s.active!.options.map(ids);
+
+  for (const rules of ["gh", "fh"] as const) {
+    it(`${rules}: two plain cards are a choice, drawn as one undo step`, () => {
+      const state = deckOf(plain("a", 1), plain("b", 0));
+      const after = drawAdvantage(state, { kind: "advantage", rules }, identityShuffle);
+      expect(optionIds(after)).toEqual([["a"], ["b"]]);
+      expect(after.active!.lead).toEqual([]);
+      expect(after.discardPile).toHaveLength(2);
+      const undone = undo(after);
+      expect(undone.drawPile).toEqual(state.drawPile);
+      expect(undone.active).toBeNull();
+    });
+
+    it(`${rules}: flags needsShuffle if either card is miss or x2`, () => {
+      const state = deckOf(plain("a", 1), { id: "x", value: "x2", rolling: false, effects: [] });
+      expect(drawAdvantage(state, { kind: "disadvantage", rules }, identityShuffle).needsShuffle).toBe(true);
+    });
+  }
+
+  describe("Gloomhaven 1st edition", () => {
+    const gh = (kind: "advantage" | "disadvantage") => ({ kind, rules: "gh" as const });
+
+    it("advantage: one rolling card adds to the other — no choice", () => {
+      const after = drawAdvantage(deckOf(roll("r"), plain("a", 1), plain("z", 2)), gh("advantage"), identityShuffle);
+      expect(optionIds(after)).toEqual([["r", "a"]]);
+      // Also when the rolling card comes second.
+      const later = drawAdvantage(deckOf(plain("a", 1), roll("r"), plain("z", 2)), gh("advantage"), identityShuffle);
+      expect(optionIds(later)).toEqual([["a", "r"]]);
+    });
+
+    it("advantage: both rolling draws on to a non-rolling card and adds everything", () => {
+      const after = drawAdvantage(deckOf(roll("r1"), roll("r2"), roll("r3"), plain("a", 0), plain("z", 2)), gh("advantage"), identityShuffle);
+      expect(optionIds(after)).toEqual([["r1", "r2", "r3", "a"]]);
+      expect(after.drawPile[0]!.id).toBe("z");
+    });
+
+    it("disadvantage: rolling cards are disregarded", () => {
+      const one = drawAdvantage(deckOf(roll("r"), plain("a", 1), plain("z", 2)), gh("disadvantage"), identityShuffle);
+      expect(optionIds(one)).toEqual([["a"]]);
+      expect(ids(one.active!.lead)).toEqual(["r"]);
+      expect(one.active!.leadApplies).toBe(false);
+
+      const both = drawAdvantage(deckOf(roll("r1"), roll("r2"), plain("a", 1), plain("z", 2)), gh("disadvantage"), identityShuffle);
+      expect(optionIds(both)).toEqual([["a"]]);
+      expect(ids(both.active!.lead)).toEqual(["r1", "r2"]);
+      // Disregarded cards were still drawn, so they go to the discard.
+      expect(ids(both.discardPile).sort()).toEqual(["a", "r1", "r2"]);
+    });
   });
 
-  it("undo reverts both draws of advantage in one step", () => {
-    const cards = buildBaseDeck();
-    const state = makeDeck(cards, identityShuffle);
-    const after = drawAdvantage(state, identityShuffle);
-    const undone = undo(after);
-    expect(undone.drawPile).toHaveLength(20);
-    expect(undone.discardPile).toHaveLength(0);
-    expect(undone.active).toEqual([]);
-  });
+  describe("Frosthaven", () => {
+    const fh = (kind: "advantage" | "disadvantage", rollingHouseRule = false) => ({
+      kind,
+      rules: "fh" as const,
+      rollingHouseRule,
+    });
 
-  it("handles rolling sequences within advantage draws", () => {
-    const rolling: Card = { id: "r", value: 0, rolling: true, effects: ["fire"] };
-    const final: Card = { id: "f", value: 2, rolling: false, effects: [] };
-    const next: Card = { id: "n", value: 1, rolling: false, effects: [] };
-    const filler = buildBaseDeck();
-    const cards = [rolling, final, next, ...filler];
-    const state = makeDeck(cards, identityShuffle);
-    const after = drawAdvantage(state, identityShuffle);
-    expect(after.active[0]).toHaveLength(2);
-    expect(after.active[1]).toHaveLength(1);
-    expect(after.active[1]![0]).toEqual(next);
-  });
+    it("advantage: opening rolling cards add to whichever of the next two is picked", () => {
+      const after = drawAdvantage(deckOf(roll("r1"), roll("r2"), plain("n", 0), plain("t", 1), plain("z", 2)), fh("advantage"), identityShuffle);
+      expect(ids(after.active!.lead)).toEqual(["r1", "r2"]);
+      expect(after.active!.leadApplies).toBe(true);
+      expect(optionIds(after)).toEqual([["n"], ["t"]]);
+    });
 
-  it("flags needsShuffle if either draw hits miss or x2", () => {
-    const x2First = [
-      { id: "x", value: "x2" as const, rolling: false, effects: [] },
-      ...buildBaseDeck().filter((c) => c.value !== "x2"),
-    ];
-    const state = makeDeck(x2First, identityShuffle);
-    const after = drawAdvantage(state, identityShuffle);
-    expect(after.needsShuffle).toBe(true);
+    it("disadvantage: opening rolling cards are ignored", () => {
+      const after = drawAdvantage(deckOf(roll("r"), plain("n", 0), plain("t", 1)), fh("disadvantage"), identityShuffle);
+      expect(ids(after.active!.lead)).toEqual(["r"]);
+      expect(after.active!.leadApplies).toBe(false);
+      expect(optionIds(after)).toEqual([["n"], ["t"]]);
+    });
+
+    it("ignores the rolling icon on the second card", () => {
+      const after = drawAdvantage(deckOf(plain("n", 0), roll("t"), plain("z", 2)), fh("advantage"), identityShuffle);
+      expect(optionIds(after)).toEqual([["n"], ["t"]]);
+      expect(after.active!.rollingIgnored).toEqual(["t"]);
+      expect(after.drawPile[0]!.id).toBe("z");
+    });
+
+    it("house rule: a rolling second card draws on to a non-rolling one", () => {
+      const adv = drawAdvantage(deckOf(plain("n", 0), roll("t"), plain("u", 1), plain("z", 2)), fh("advantage", true), identityShuffle);
+      expect(optionIds(adv)).toEqual([["n"], ["t", "u"]]);
+      expect(adv.active!.rollingIgnored).toEqual([]);
+
+      // With disadvantage the chain's rolling cards are disregarded.
+      const dis = drawAdvantage(deckOf(plain("n", 0), roll("t"), plain("u", 1), plain("z", 2)), fh("disadvantage", true), identityShuffle);
+      expect(optionIds(dis)).toEqual([["n"], ["u"]]);
+      expect(ids(dis.active!.lead)).toEqual(["t"]);
+    });
   });
 });
 
@@ -225,7 +311,7 @@ describe("bless and curse", () => {
     ];
     const state = makeDeck(blessFirst, identityShuffle);
     const after = draw(state, identityShuffle);
-    expect(after.active[0]![0]!.effects).toContain("bless");
+    expect(after.active!.options[0]![0]!.effects).toContain("bless");
     expect(after.discardPile.find((c) => c.effects.includes("bless"))).toBeUndefined();
     expect(countCards(after)).toBe(20);
   });
@@ -279,7 +365,7 @@ describe("recentDraws", () => {
     const state = makeDeck([bless, ...buildBaseDeck()], identityShuffle);
     const d1 = draw(state, identityShuffle);
     const d2 = draw(d1, identityShuffle);
-    expect(d2.recentDraws.map((c) => c.id)).toEqual(["b", d2.active[0]![0]!.id]);
+    expect(d2.recentDraws.map((c) => c.id)).toEqual(["b", d2.active!.options[0]![0]!.id]);
     expect(d2.discardPile.find((c) => c.id === "b")).toBeUndefined();
   });
 
@@ -289,7 +375,7 @@ describe("recentDraws", () => {
     const state = makeDeck([rolling, ...plain], identityShuffle);
     const d1 = draw(state, identityShuffle); // rolling + next card
     expect(d1.recentDraws).toHaveLength(2);
-    const d2 = drawAdvantage(d1, identityShuffle);
+    const d2 = drawAdvantage(d1, { kind: "advantage", rules: "gh" }, identityShuffle);
     expect(d2.recentDraws).toHaveLength(4);
   });
 
@@ -345,8 +431,8 @@ describe("reshuffle", () => {
   it("a full shuffle clears the display; shuffling only the draw pile keeps it", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const drawn = draw(state, identityShuffle);
-    expect(drawn.active).toHaveLength(1);
-    expect(reshuffleAll(drawn, identityShuffle).active).toEqual([]);
+    expect(drawn.active!.options).toHaveLength(1);
+    expect(reshuffleAll(drawn, identityShuffle).active).toBeNull();
     expect(reshuffleDrawPile(drawn, identityShuffle).active).toEqual(drawn.active);
   });
 });
@@ -355,9 +441,9 @@ describe("undo", () => {
   it("restores the prior state after a single draw", () => {
     const state = makeDeck(buildBaseDeck(), identityShuffle);
     const drawn = draw(state, identityShuffle);
-    expect(drawn.active).toHaveLength(1);
+    expect(drawn.active!.options).toHaveLength(1);
     const undone = undo(drawn);
-    expect(undone.active).toEqual([]);
+    expect(undone.active).toBeNull();
     expect(undone.drawPile).toHaveLength(20);
     expect(undone.discardPile).toHaveLength(0);
     expect(undone.history).toEqual([]);
@@ -367,7 +453,7 @@ describe("undo", () => {
     const cards = buildBaseDeck();
     const state = makeDeck(cards, identityShuffle);
     const drawn = draw(state, identityShuffle);
-    const drawnCard = drawn.active[0]![0]!;
+    const drawnCard = drawn.active!.options[0]![0]!;
     const undone = undo(drawn);
     expect(undone.drawPile[0]).toEqual(drawnCard);
   });
@@ -379,9 +465,9 @@ describe("undo", () => {
     const cards = [rolling, final, ...filler];
     const state = makeDeck(cards, identityShuffle);
     const drawn = draw(state, identityShuffle);
-    expect(drawn.active[0]).toHaveLength(2);
+    expect(drawn.active!.options[0]).toHaveLength(2);
     const undone = undo(drawn);
-    expect(undone.active).toEqual([]);
+    expect(undone.active).toBeNull();
     expect(undone.drawPile[0]).toEqual(rolling);
     expect(undone.drawPile[1]).toEqual(final);
   });
@@ -415,7 +501,7 @@ describe("undo", () => {
     expect(u2.drawPile).toHaveLength(d1.drawPile.length);
     const u3 = undo(u2);
     expect(u3.drawPile).toHaveLength(20);
-    expect(u3.active).toEqual([]);
+    expect(u3.active).toBeNull();
     expect(u3.history).toEqual([]);
     const u4 = undo(u3);
     expect(u4).toEqual(u3);
@@ -531,7 +617,7 @@ describe("temp cards", () => {
     ];
     const state = makeDeck(tempFirst, identityShuffle);
     const after = draw(state, identityShuffle);
-    expect(after.active[0]![0]!.id).toBe("temp-t");
+    expect(after.active!.options[0]![0]!.id).toBe("temp-t");
     expect(after.discardPile.find((c) => c.id === "temp-t")).toBeDefined();
     expect(countCards(after)).toBe(21);
     expect(after.needsShuffle).toBe(false);
@@ -629,7 +715,7 @@ describe("pile exhausted mid-draw", () => {
       discardPile: [plain("d", 1)],
     };
     const after = draw(state, identityShuffle);
-    expect(after.active[0]!.map((c) => c.id)).toEqual(["r", "d"]);
+    expect(after.active!.options[0]!.map((c) => c.id)).toEqual(["r", "d"]);
     expect(after.drawPile).toEqual([]);
     expect(after.discardPile.map((c) => c.id).sort()).toEqual(["d", "r"]);
   });
@@ -640,15 +726,15 @@ describe("pile exhausted mid-draw", () => {
       drawPile: [plain("a", 1)],
       discardPile: [plain("b", -1)],
     };
-    const after = drawAdvantage(state, identityShuffle);
-    expect(after.active.map((seq) => seq.map((c) => c.id))).toEqual([["a"], ["b"]]);
+    const after = drawAdvantage(state, { kind: "advantage", rules: "gh" }, identityShuffle);
+    expect(after.active!.options.map((seq) => seq.map((c) => c.id))).toEqual([["a"], ["b"]]);
     expect(after.discardPile.map((c) => c.id).sort()).toEqual(["a", "b"]);
   });
 
   it("stops short instead of crashing when every card is in play", () => {
     const state = { ...makeDeck([], identityShuffle), drawPile: [rolling("r")] };
     const after = draw(state, identityShuffle);
-    expect(after.active[0]!.map((c) => c.id)).toEqual(["r"]);
+    expect(after.active!.options[0]!.map((c) => c.id)).toEqual(["r"]);
     expect(after.discardPile.map((c) => c.id)).toEqual(["r"]);
   });
 });
@@ -662,7 +748,7 @@ describe("resetDeck", () => {
     const reset = resetDeck(s, buildBaseDeck(), identityShuffle);
     expect(reset.drawPile).toHaveLength(20);
     expect(reset.discardPile).toEqual([]);
-    expect(reset.active).toEqual([]);
+    expect(reset.active).toBeNull();
     expect(reset.recentDraws).toEqual([]);
     expect(countBless(reset)).toBe(0);
 

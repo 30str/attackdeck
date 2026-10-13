@@ -1,10 +1,16 @@
 import { ScrollView, View, Text, Switch, Pressable, Alert, Linking, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useSettings } from "@/src/state/settings";
+import { useSettings, type AdvantageRulesSetting } from "@/src/state/settings";
 import { CLASSES } from "@/src/data";
 import { isUnlockable } from "@/src/data/types";
 import { SUPPORTED_LOCALES, type SupportedLocale } from "@/src/i18n";
 import { CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
+
+const ADVANTAGE_CHOICES: { value: AdvantageRulesSetting; label: string; sub: string }[] = [
+  { value: "auto", label: "settings.advAuto", sub: "settings.advAutoSub" },
+  { value: "fh", label: "settings.advFh", sub: "settings.advFhSub" },
+  { value: "gh", label: "settings.advGh", sub: "settings.advGhSub" },
+];
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -15,6 +21,10 @@ export default function SettingsScreen() {
   const unlockAllAction = useSettings((s) => s.unlockAll);
   const languageOverride = useSettings((s) => s.languageOverride);
   const setLanguage = useSettings((s) => s.setLanguage);
+  const advantageRules = useSettings((s) => s.advantageRules);
+  const setAdvantageRules = useSettings((s) => s.setAdvantageRules);
+  const rollingHouseRule = useSettings((s) => s.rollingHouseRule);
+  const setRollingHouseRule = useSettings((s) => s.setRollingHouseRule);
 
   const lockableClasses = CLASSES.filter(isUnlockable);
   const lockableIds = lockableClasses.map((c) => c.id);
@@ -47,6 +57,36 @@ export default function SettingsScreen() {
           onValueChange={setHapticsEnabled}
           trackColor={{ false: "#2a2a2a", true: "#cbb26a" }}
           thumbColor={hapticsEnabled ? "#0a0a0a" : "#888"}
+        />
+      </View>
+
+      <Text style={styles.section}>{t("settings.advantage")}</Text>
+      <View style={styles.block}>
+        <Text style={styles.body}>{t("settings.advantageSub")}</Text>
+      </View>
+      {ADVANTAGE_CHOICES.map(({ value, label, sub }) => (
+        <Pressable
+          key={value}
+          style={[styles.langRow, advantageRules === value && styles.langRowSel]}
+          onPress={() => setAdvantageRules(value)}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.langTxt}>{t(label)}</Text>
+            <Text style={styles.rowSub}>{t(sub)}</Text>
+          </View>
+          {advantageRules === value ? <Text style={styles.langCheck}>✓</Text> : null}
+        </Pressable>
+      ))}
+      <View style={[styles.row, { marginTop: 4 }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rowLabel}>{t("settings.rollingHouseRule")}</Text>
+          <Text style={styles.rowSub}>{t("settings.rollingHouseRuleSub")}</Text>
+        </View>
+        <Switch
+          value={rollingHouseRule}
+          onValueChange={setRollingHouseRule}
+          trackColor={{ false: "#2a2a2a", true: "#cbb26a" }}
+          thumbColor={rollingHouseRule ? "#0a0a0a" : "#888"}
         />
       </View>
 

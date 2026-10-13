@@ -17,9 +17,13 @@ import {
   removeCurse,
   addTempCard,
   removeTempCard,
+  type ActiveDraw,
+  type AdvantageOptions,
+  type DeckSnapshot,
   type DeckState,
   type TempCardValue,
 } from "../engine/deck";
+import type { Card } from "../data/types";
 
 export type Character = {
   id: string;
@@ -37,7 +41,7 @@ type PartyState = {
   togglePerk: (id: string, perkId: string, delta: 1 | -1) => void;
   rebuildDeck: (id: string) => void;
   drawCard: (id: string) => void;
-  drawCardAdvantage: (id: string) => void;
+  drawCardAdvantage: (id: string, opts: AdvantageOptions) => void;
   undoDraw: (id: string) => void;
   shuffleAll: (id: string) => void;
   shuffleDrawPile: (id: string) => void;
@@ -135,10 +139,10 @@ export const useParty = create<PartyState>()(
         });
       },
 
-      drawCardAdvantage: (id) => {
+      drawCardAdvantage: (id, opts) => {
         set({
           characters: get().characters.map((c) =>
-            c.id === id ? { ...c, deck: drawAdvantage(c.deck) } : c
+            c.id === id ? { ...c, deck: drawAdvantage(c.deck, opts) } : c
           ),
         });
       },
@@ -218,7 +222,7 @@ export const useParty = create<PartyState>()(
     {
       name: "party",
       storage: createDebouncedStorage<{ characters: Character[] }>(),
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         characters: state.characters.map((c) =>
           c.deck.history.length > PERSISTED_HISTORY
@@ -230,6 +234,8 @@ export const useParty = create<PartyState>()(
       // stack. Drop the dead field and seed an empty stack so rehydrated decks
       // don't crash pushHistory()/canUndo() on the first action after upgrade.
       // v2 adds `recentDraws` to decks and to every history snapshot.
+      // v3 replaces `active: Card[][]` (one sequence per draw) with a
+      // structured ActiveDraw, in decks and history snapshots alike.
       migrate: (persisted, version) => {
         const state = persisted as { characters?: Character[] } | undefined;
         if (state?.characters && version < 1) {
@@ -256,11 +262,42 @@ export const useParty = create<PartyState>()(
             };
           });
         }
+        if (state?.characters && version < 3) {
+          state.characters = state.characters.map((c) => {
+            if (!c.deck) return c;
+            return {
+              ...c,
+              deck: {
+                ...migrateActive(c.deck),
+                history: (c.deck.history ?? []).map(migrateActive),
+              },
+            };
+          });
+        }
         return state as PartyState;
       },
     }
   )
 );
+
+// Pre-v3 decks stored the revealed sequences: one for a normal draw, two for
+// advantage/disadvantage (which one is no longer known — call it advantage).
+function migrateActive<T extends DeckSnapshot>(snap: T): T {
+  const old = snap.active as unknown;
+  if (!Array.isArray(old)) return snap;
+  const options = (old as Card[][]).filter((seq) => seq.length > 0);
+  const active: ActiveDraw | null =
+    options.length === 0
+      ? null
+      : {
+          kind: options.length > 1 ? "advantage" : "normal",
+          lead: [],
+          leadApplies: false,
+          options,
+          rollingIgnored: [],
+        };
+  return { ...snap, active };
+}
 
 export function selectCharacter(id: string | undefined): Character | undefined {
   if (!id) return undefined;

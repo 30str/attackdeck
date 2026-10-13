@@ -55,7 +55,10 @@
     "drawTwice": "PESCA × 2",
     "tempCards": "Carte temp.",
     "tempTitle": "Carte temporanee",
-    "tempBody": "Gli effetti di scenario o degli oggetti a volte aggiungono carte modificatore semplici al tuo mazzo. Vanno negli scarti e vengono rimescolate come le carte normali, e restano nel mazzo finché non le rimuovi qui o reimposti il mazzo."
+    "tempBody": "Gli effetti di scenario o degli oggetti a volte aggiungono carte modificatore semplici al tuo mazzo. Vanno negli scarti e vengono rimescolate come le carte normali, e restano nel mazzo finché non le rimuovi qui o reimposti il mazzo.",
+    "leadApplies": "Si sommano alla carta scelta",
+    "leadIgnored": "Ignorate (svantaggio)",
+    "missEffects": "MANCATO: nessun danno, ma gli effetti aggiunti si applicano"
   },
   "settings": {
     "preferences": "Preferenze",
@@ -82,7 +85,17 @@
     "creditsDesign": "Game design: Isaac Childres / Cephalofair Games.",
     "creditsData": "Dati dei bonus: Lurkars + contributi della community a Gloomhaven Secretariat.",
     "creditsApp": "App: costruita con React Native + Expo.",
-    "creditsCompany": "Sviluppato da 30str — 30str.com"
+    "creditsCompany": "Sviluppato da 30str — 30str.com",
+    "advantage": "Vantaggio e svantaggio",
+    "advantageSub": "Come funzionano i modificatori a catena quando peschi con vantaggio o svantaggio.",
+    "advAuto": "Automatico (per gioco)",
+    "advAutoSub": "Le classi di Frosthaven usano le sue regole; tutte le altre quelle di Gloomhaven.",
+    "advFh": "Frosthaven / Gloomhaven 2ª ed.",
+    "advFhSub": "Pesca oltre le carte a catena, poi una in più. Le carte a catena si sommano a quella scelta; il simbolo della seconda carta è ignorato.",
+    "advGh": "Gloomhaven 1ª ed.",
+    "advGhSub": "Pesca due carte. Una carta a catena si somma all'altra, quindi non si sceglie; con svantaggio le carte a catena sono ignorate.",
+    "rollingHouseRule": "Regola della casa: continua sulla seconda carta",
+    "rollingHouseRuleSub": "Con le regole di Frosthaven, una seconda carta a catena fa pescare fino a una carta normale invece di ignorarne il simbolo."
   },
   "games": {
     "gloomhaven": "Gloomhaven",
@@ -140,5 +153,9 @@
     "es": "Español",
     "it": "Italiano",
     "auto": "Automatico (lingua del dispositivo)"
+  },
+  "update": {
+    "ready": "Aggiorna",
+    "readyA11y": "Aggiornamento pronto. Tocca per riavviare l'app e applicarlo."
   }
 }

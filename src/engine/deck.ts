@@ -1,9 +1,31 @@
 import type { Card, CardSpec, Perk, PerkOp } from "../data/types";
 
+export type DrawKind = "normal" | "advantage" | "disadvantage";
+
+/** Which advantage/disadvantage procedure to follow (see drawAdvantage). */
+export type AdvantageRules = "gh" | "fh";
+
+/** What the last draw revealed, structured for display. The app doesn't do
+ * the attack math — the player reads the cards — so this records which cards
+ * count and whether there's a choice to make. */
+export type ActiveDraw = {
+  kind: DrawKind;
+  /** Rolling cards revealed before the options. */
+  lead: Card[];
+  /** true: the lead cards add to whichever option is picked (advantage);
+   * false: they were revealed but are disregarded (disadvantage). */
+  leadApplies: boolean;
+  /** One entry is the result; two means the player picks between them. Each
+   * is a chain: any rolling cards that count, then a final card. */
+  options: Card[][];
+  /** Cards whose rolling icon doesn't count (Frosthaven's second draw). */
+  rollingIgnored: string[];
+};
+
 export type DeckSnapshot = {
   drawPile: Card[];
   discardPile: Card[];
-  active: Card[][];
+  active: ActiveDraw | null;
   // Chronological log of every card revealed by a draw, oldest first. The
   // piles can't reconstruct this: one-shots (bless/curse) leave the game the
   // moment they're drawn. Feeds the discard-cascade display; cleared by a
@@ -29,7 +51,7 @@ function snapshot(state: DeckState): DeckSnapshot {
   return {
     drawPile: state.drawPile.slice(),
     discardPile: state.discardPile.slice(),
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   };
@@ -59,7 +81,7 @@ export function makeDeck(cards: readonly Card[], shuffle: ShuffleFn = fisherYate
   return {
     drawPile: shuffle(cards),
     discardPile: [],
-    active: [],
+    active: null,
     recentDraws: [],
     needsShuffle: false,
     history: [],
@@ -73,87 +95,150 @@ function shufflesOnDraw(card: Card): boolean {
   return card.value === "miss" || card.value === "x2";
 }
 
-type DrawResult = {
-  drawPile: Card[];
-  // Excludes the cards in `sequence`: they're in play until the whole draw
-  // resolves, so the caller adds them to the discard afterwards.
-  discardPile: Card[];
-  sequence: Card[];
-  needsShuffle: boolean;
+// Cards that go to the discard once played (one-shots leave the game).
+function discarded(cards: readonly Card[]): Card[] {
+  return cards.filter((c) => !c.oneShot);
+}
+
+// Deals cards one at a time for a single draw (which may reveal many cards).
+// Revealed cards stay in play — out of the discard — until the whole draw
+// resolves, so if the pile runs dry and the discard is shuffled back in, a
+// card already revealed can't come up twice.
+class Dealer {
+  pile: Card[];
+  discard: Card[];
+  revealed: Card[] = [];
+  private shuffle: ShuffleFn;
+  constructor(drawPile: readonly Card[], discardPile: readonly Card[], shuffle: ShuffleFn) {
+    this.pile = drawPile.slice();
+    this.discard = discardPile.slice();
+    this.shuffle = shuffle;
+  }
+  /** The next card, or undefined when every card is already in play. */
+  next(): Card | undefined {
+    if (this.pile.length === 0) {
+      // The rules shuffle an empty pile immediately, mid-draw or not.
+      if (this.discard.length === 0) return undefined;
+      this.pile = this.shuffle(this.discard);
+      this.discard = [];
+    }
+    const card = this.pile.shift()!;
+    this.revealed.push(card);
+    return card;
+  }
+  /** Cards up to and including the first non-rolling one. */
+  chain(): Card[] {
+    const out: Card[] = [];
+    for (let c = this.next(); c; c = c.rolling ? this.next() : undefined) out.push(c);
+    return out;
+  }
+}
+
+function settle(state: DeckState, dealer: Dealer, active: ActiveDraw): DeckState {
+  return pushHistory(state, {
+    drawPile: dealer.pile,
+    discardPile: dealer.discard.concat(discarded(dealer.revealed)),
+    active,
+    recentDraws: state.recentDraws.concat(dealer.revealed).slice(-MAX_RECENT_DRAWS),
+    // Sticky: a pending shuffle survives later draws until reshuffled.
+    needsShuffle: state.needsShuffle || dealer.revealed.some(shufflesOnDraw),
+  });
+}
+
+function nonEmpty(options: Card[][]): Card[][] {
+  return options.filter((o) => o.length > 0);
+}
+
+// A pending shuffle (miss / x2 revealed) does NOT reshuffle here: the rules
+// shuffle at end of round, and later attacks in the same round keep drawing
+// from what's left. The flag stays set until reshuffleAll / reshuffleDrawPile.
+// Only an empty pile forces an immediate reshuffle (inside the Dealer).
+export function draw(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
+  const dealer = new Dealer(state.drawPile, state.discardPile, shuffle);
+  return settle(state, dealer, {
+    kind: "normal",
+    lead: [],
+    leadApplies: false,
+    options: nonEmpty([dealer.chain()]),
+    rollingIgnored: [],
+  });
+}
+
+export type AdvantageOptions = {
+  kind: "advantage" | "disadvantage";
+  rules: AdvantageRules;
+  /** Frosthaven rules only: a rolling second card keeps drawing to a
+   * non-rolling one instead of having its rolling icon ignored. */
+  rollingHouseRule?: boolean;
 };
 
-// Cards that go to the discard once played (one-shots leave the game).
-function discarded(sequence: readonly Card[]): Card[] {
-  return sequence.filter((c) => !c.oneShot);
-}
-
-function drawOnce(
-  drawPile: Card[],
-  discardPile: Card[],
-  needsShuffleAtStart: boolean,
-  shuffle: ShuffleFn
-): DrawResult {
-  let pile = drawPile.slice();
-  let discard = discardPile.slice();
-  if (needsShuffleAtStart || pile.length === 0) {
-    pile = shuffle(pile.concat(discard));
-    discard = [];
+// Gloomhaven 1st edition: draw two. Both non-rolling → the player picks.
+// Otherwise there's no choice: with advantage, rolling cards add to the other
+// card (both rolling → draw on to a non-rolling one and add everything); with
+// disadvantage, rolling cards are disregarded and the non-rolling card is the
+// result.
+function dealGh(dealer: Dealer, kind: AdvantageOptions["kind"]): ActiveDraw {
+  const two = [dealer.next(), dealer.next()].filter((c): c is Card => !!c);
+  if (two.every((c) => !c.rolling)) {
+    return { kind, lead: [], leadApplies: false, options: two.map((c) => [c]), rollingIgnored: [] };
   }
-
-  const sequence: Card[] = [];
-  let needsShuffle = false;
-
-  while (true) {
-    if (pile.length === 0) {
-      // The pile ran dry mid-sequence: shuffle the discard back in. Cards in
-      // play aren't in `discard` yet, so the same card can't come up twice.
-      // If nothing is left at all (every card is in play), stop short.
-      if (discard.length === 0) break;
-      pile = shuffle(discard);
-      discard = [];
-    }
-    const card = pile.shift()!;
-    sequence.push(card);
-
-    if (shufflesOnDraw(card)) {
-      needsShuffle = true;
-    }
-
-    if (!card.rolling) {
-      break;
-    }
+  const all = two.every((c) => c.rolling) ? two.concat(dealer.chain()) : two;
+  if (kind === "advantage") {
+    return { kind, lead: [], leadApplies: false, options: [all], rollingIgnored: [] };
   }
-
-  return { drawPile: pile, discardPile: discard, sequence, needsShuffle };
+  return {
+    kind,
+    lead: all.filter((c) => c.rolling),
+    leadApplies: false,
+    options: nonEmpty([all.filter((c) => !c.rolling)]),
+    rollingIgnored: [],
+  };
 }
 
-export function draw(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
-  const result = drawOnce(state.drawPile, state.discardPile, state.needsShuffle, shuffle);
-  return pushHistory(state, {
-    drawPile: result.drawPile,
-    discardPile: result.discardPile.concat(discarded(result.sequence)),
-    active: [result.sequence],
-    recentDraws: state.recentDraws.concat(result.sequence).slice(-MAX_RECENT_DRAWS),
-    needsShuffle: result.needsShuffle,
-  });
+// Frosthaven / Gloomhaven 2nd edition: draw through any opening rolling cards
+// to a non-rolling one, then draw one more. The player picks between those
+// two; the opening rolling cards add to whichever is picked with advantage
+// and are ignored with disadvantage. The second card's rolling icon is
+// ignored — unless the house rule has it draw on like a normal rolling card.
+function dealFh(dealer: Dealer, opts: AdvantageOptions): ActiveDraw {
+  const opening = dealer.chain();
+  const lead = opening.filter((c) => c.rolling);
+  const first = opening.filter((c) => !c.rolling);
+  const t = dealer.next();
+  let second: Card[] = t ? [t] : [];
+  const rollingIgnored: string[] = [];
+  if (t?.rolling) {
+    if (opts.rollingHouseRule) second = second.concat(dealer.chain());
+    else rollingIgnored.push(t.id);
+  }
+  if (opts.kind === "disadvantage") {
+    // Every rolling card is disregarded with disadvantage, so a house-rule
+    // chain on the second draw contributes only its final card.
+    const counts = (c: Card) => !c.rolling || rollingIgnored.includes(c.id);
+    return {
+      kind: opts.kind,
+      lead: lead.concat(second.filter((c) => !counts(c))),
+      leadApplies: false,
+      options: nonEmpty([first, second.filter(counts)]),
+      rollingIgnored,
+    };
+  }
+  return { kind: opts.kind, lead, leadApplies: true, options: nonEmpty([first, second]), rollingIgnored };
 }
 
-export function drawAdvantage(state: DeckState, shuffle: ShuffleFn = fisherYates): DeckState {
-  const first = drawOnce(state.drawPile, state.discardPile, state.needsShuffle, shuffle);
-  // Both advantage draws happen before any shuffle (shuffle is end-of-round per
-  // the Gloomhaven rule). Pass needsShuffleAtStart=false so the second draw
-  // doesn't reshuffle just because the first one revealed miss or x2. The
-  // first sequence stays in play (out of the discard) during the second draw.
-  const second = drawOnce(first.drawPile, first.discardPile, false, shuffle);
-  return pushHistory(state, {
-    drawPile: second.drawPile,
-    discardPile: second.discardPile.concat(discarded(first.sequence), discarded(second.sequence)),
-    active: [first.sequence, second.sequence],
-    recentDraws: state.recentDraws
-      .concat(first.sequence, second.sequence)
-      .slice(-MAX_RECENT_DRAWS),
-    needsShuffle: first.needsShuffle || second.needsShuffle,
-  });
+export function drawAdvantage(
+  state: DeckState,
+  opts: AdvantageOptions,
+  shuffle: ShuffleFn = fisherYates
+): DeckState {
+  const dealer = new Dealer(state.drawPile, state.discardPile, shuffle);
+  const active = opts.rules === "fh" ? dealFh(dealer, opts) : dealGh(dealer, opts.kind);
+  return settle(state, dealer, active);
+}
+
+/** Every card the current draw revealed (lead row and all options). */
+export function activeCards(active: ActiveDraw | null): Card[] {
+  return active ? active.lead.concat(...active.options) : [];
 }
 
 export function undo(state: DeckState): DeckState {
@@ -175,7 +260,7 @@ export function reshuffle(state: DeckState, shuffle: ShuffleFn = fisherYates): D
   return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: [],
-    active: [],
+    active: null,
     recentDraws: [],
     needsShuffle: false,
   });
@@ -193,7 +278,7 @@ export function resetDeck(
   return pushHistory(state, {
     drawPile: shuffle(cards),
     discardPile: [],
-    active: [],
+    active: null,
     recentDraws: [],
     needsShuffle: false,
   });
@@ -207,7 +292,7 @@ export function reshuffleDrawPile(state: DeckState, shuffle: ShuffleFn = fisherY
   return pushHistory(state, {
     drawPile: shuffle(state.drawPile),
     discardPile: state.discardPile.slice(),
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: false,
   });
@@ -221,7 +306,7 @@ export function peek(state: DeckState, n: number, shuffle: ShuffleFn = fisherYat
   const sequences: Card[][] = [];
   for (let i = 0; i < n; i++) {
     s = draw(s, shuffle);
-    sequences.push(s.active[0] ?? []);
+    sequences.push(s.active?.options[0] ?? []);
   }
   return { state: s, sequences };
 }
@@ -293,7 +378,7 @@ export function addBless(state: DeckState, shuffle: ShuffleFn = fisherYates): De
   return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: state.discardPile.slice(),
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
@@ -311,7 +396,7 @@ export function addCurse(state: DeckState, shuffle: ShuffleFn = fisherYates): De
   return pushHistory(state, {
     drawPile: shuffle(combined),
     discardPile: state.discardPile.slice(),
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
@@ -325,7 +410,7 @@ export function removeBless(state: DeckState, shuffle: ShuffleFn = fisherYates):
   return pushHistory(state, {
     drawPile: shuffle(drawPile),
     discardPile: state.discardPile.slice(),
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
@@ -339,7 +424,7 @@ export function removeCurse(state: DeckState, shuffle: ShuffleFn = fisherYates):
   return pushHistory(state, {
     drawPile: shuffle(drawPile),
     discardPile: state.discardPile.slice(),
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
@@ -370,7 +455,7 @@ export function addTempCard(
   return pushHistory(state, {
     drawPile: shuffle(state.drawPile.concat([card])),
     discardPile: state.discardPile.slice(),
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });
@@ -391,7 +476,7 @@ export function removeTempCard(
     return pushHistory(state, {
       drawPile: shuffle(drawPile),
       discardPile: state.discardPile.slice(),
-      active: state.active.map((seq) => seq.slice()),
+      active: state.active,
       recentDraws: state.recentDraws.slice(),
       needsShuffle: state.needsShuffle,
     });
@@ -403,7 +488,7 @@ export function removeTempCard(
   return pushHistory(state, {
     drawPile: state.drawPile.slice(),
     discardPile,
-    active: state.active.map((seq) => seq.slice()),
+    active: state.active,
     recentDraws: state.recentDraws.slice(),
     needsShuffle: state.needsShuffle,
   });

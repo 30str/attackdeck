@@ -7,6 +7,11 @@
 // lays out as a grid, so a long rolling chain wraps instead of shrinking to
 // nothing. Advantage shows two sequences side by side at ONE shared scale —
 // the two results must be the same size to compare at a glance.
+//
+// An optional lead row sits above the options: rolling cards revealed before
+// them (added to either option with advantage, ignored with disadvantage).
+// It's secondary, so it draws at LEAD_RATIO of the option size, under a
+// fixed-height label band.
 
 export const CARD_W = 260;
 export const CARD_H = 360;
@@ -15,6 +20,8 @@ const CARD_GAP = 16; // native, between cards of one sequence
 const COLUMN_GAP = 48; // native, between the two advantage columns (holds the divider)
 const STACK_OFF = 26; // native, per discard-cascade card
 const STACK_OFF_MIN = 16; // px — keeps the cascade's corner values visible when small
+const LEAD_RATIO = 0.6; // lead-row card size relative to the options
+const LEAD_GAP = 24; // native, between the lead row and the options
 const MAX_SCALE = 1.5;
 const MIN_SCALE = 0.05;
 
@@ -29,10 +36,15 @@ export type DrawLayout = {
   sequences: Point[][];
   /** Center x of the gap between advantage columns, in px — where a divider
    * goes so two wrapped rolling chains don't read as one grid. Spans the
-   * cards' full height (from `ext` to `height`). */
+   * options' full height (from `top` to `height`). */
   dividers: number[];
-  /** Top of the revealed cards (below the cascade's reserved band), in px. */
+  /** Top of the option cards (below the cascade band and any lead row), in px. */
   top: number;
+  /** Lead-row cards' top-left, and their scale (smaller than `scale`). */
+  lead: Point[];
+  leadScale: number;
+  /** Top of the lead row's label band, in px (its height is the `labelH` passed in). */
+  leadLabelY: number;
   /** Top-left of each cascade card (oldest first), in px. */
   stack: Point[];
 };
@@ -85,49 +97,76 @@ function fit(
   return { scale, off };
 }
 
+// Top-left of each card of a grid laid out from (x0, y0) at `s` px per
+// native unit, centering a partially filled last row.
+function place(g: Grid, x0: number, y0: number, s: number): Point[] {
+  const cards: Point[] = [];
+  for (let i = 0; i < g.n; i++) {
+    const row = Math.floor(i / g.cols);
+    const col = i % g.cols;
+    const inRow = Math.min(g.cols, g.n - row * g.cols);
+    const rowInset = ((g.cols - inRow) * (CARD_W + CARD_GAP)) / 2;
+    cards.push({
+      x: x0 + (rowInset + col * (CARD_W + CARD_GAP)) * s,
+      y: y0 + row * (CARD_H + CARD_GAP) * s,
+    });
+  }
+  return cards;
+}
+
 export function layoutDraw(
   sequenceLengths: number[],
   stackCount: number,
   availW: number,
-  availH: number
+  availH: number,
+  lead: { count: number; labelH: number } = { count: 0, labelH: 0 }
 ): DrawLayout {
   const gap = sequenceLengths.length > 1 ? COLUMN_GAP : 0;
+  const hasLead = lead.count > 0;
+  const labelH = hasLead ? lead.labelH : 0;
 
-  let best: { grids: Grid[]; scale: number; off: number; nw: number; nh: number } | null = null;
-  for (const grids of gridChoices(sequenceLengths)) {
-    const nw = grids.reduce((sum, g) => sum + g.w, 0) + gap * (grids.length - 1);
-    const nh = Math.max(0, ...grids.map((g) => g.h));
-    const { scale, off } = fit(nw, nh, stackCount, availW, availH);
-    if (!best || scale > best.scale) best = { grids, scale, off, nw, nh };
+  type Choice = {
+    grids: Grid[];
+    leadGrid: Grid;
+    scale: number;
+    off: number;
+    nw: number;
+    nh: number;
+    optW: number;
+    optH: number;
+  };
+  let best: Choice | null = null;
+  for (const all of gridChoices(hasLead ? [lead.count, ...sequenceLengths] : sequenceLengths)) {
+    const leadGrid = hasLead ? all[0]! : grid(0, 1);
+    const grids = hasLead ? all.slice(1) : all;
+    const optW = grids.reduce((sum, g) => sum + g.w, 0) + gap * (grids.length - 1);
+    const optH = Math.max(0, ...grids.map((g) => g.h));
+    const nw = Math.max(optW, leadGrid.w * LEAD_RATIO);
+    const nh = optH + (hasLead ? leadGrid.h * LEAD_RATIO + LEAD_GAP : 0);
+    const { scale, off } = fit(nw, nh, stackCount, availW, availH - labelH);
+    if (!best || scale > best.scale) best = { grids, leadGrid, scale, off, nw, nh, optW, optH };
   }
-  const { grids, scale: s, off, nw, nh } = best!;
+  const { grids, leadGrid, scale: s, off, nw, nh, optW, optH } = best!;
 
   const ext = stackCount * off;
+  const leadScale = s * LEAD_RATIO;
+  const leadPts = hasLead
+    ? place(leadGrid, ext + ((nw - leadGrid.w * LEAD_RATIO) / 2) * s, ext + labelH, leadScale)
+    : [];
+  const top = ext + labelH + (hasLead ? (leadGrid.h * LEAD_RATIO + LEAD_GAP) * s : 0);
+
   const sequences: Point[][] = [];
   const dividers: number[] = [];
-  let colX = ext;
+  let colX = ext + ((nw - optW) / 2) * s;
   for (const g of grids) {
     // Center a shorter column vertically against the taller one.
-    const y0 = ext + ((nh - g.h) / 2) * s;
-    const cards: Point[] = [];
-    for (let i = 0; i < g.n; i++) {
-      const row = Math.floor(i / g.cols);
-      const col = i % g.cols;
-      // Center a partially filled last row.
-      const inRow = Math.min(g.cols, g.n - row * g.cols);
-      const rowInset = ((g.cols - inRow) * (CARD_W + CARD_GAP)) / 2;
-      cards.push({
-        x: colX + (rowInset + col * (CARD_W + CARD_GAP)) * s,
-        y: y0 + row * (CARD_H + CARD_GAP) * s,
-      });
-    }
-    sequences.push(cards);
+    sequences.push(place(g, colX, top + ((optH - g.h) / 2) * s, s));
     colX += (g.w + gap) * s;
     if (sequences.length < grids.length) dividers.push(colX - (gap / 2) * s);
   }
 
   // The cascade peeks out up-left of the first revealed card, oldest deepest.
-  const anchor = sequences.find((seq) => seq.length > 0)?.[0] ?? { x: ext, y: ext };
+  const anchor = leadPts[0] ?? sequences.find((seq) => seq.length > 0)?.[0] ?? { x: ext, y: ext };
   const stack: Point[] = [];
   for (let i = 0; i < stackCount; i++) {
     const depth = stackCount - i;
@@ -137,10 +176,13 @@ export function layoutDraw(
   return {
     scale: s,
     width: ext + nw * s,
-    height: ext + nh * s,
+    height: ext + labelH + nh * s,
     sequences,
     stack,
     dividers,
-    top: ext,
+    top,
+    lead: leadPts,
+    leadScale,
+    leadLabelY: ext,
   };
 }

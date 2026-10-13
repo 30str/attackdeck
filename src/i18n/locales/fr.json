@@ -55,7 +55,10 @@
     "drawTwice": "TIRER × 2",
     "tempCards": "Cartes temp.",
     "tempTitle": "Cartes temporaires",
-    "tempBody": "Les effets de scénario ou d'objet ajoutent parfois des cartes de modificateur simples à ton paquet. Elles vont à la défausse et sont remélangées comme les cartes normales, et restent dans le paquet jusqu'à ce que tu les retires ici ou réinitialises le paquet."
+    "tempBody": "Les effets de scénario ou d'objet ajoutent parfois des cartes de modificateur simples à ton paquet. Elles vont à la défausse et sont remélangées comme les cartes normales, et restent dans le paquet jusqu'à ce que tu les retires ici ou réinitialises le paquet.",
+    "leadApplies": "S'ajoute à la carte choisie",
+    "leadIgnored": "Ignorées (désavantage)",
+    "missEffects": "RATÉ : aucun dégât, mais les effets ajoutés s'appliquent"
   },
   "settings": {
     "preferences": "Préférences",
@@ -82,7 +85,17 @@
     "creditsDesign": "Conception du jeu : Isaac Childres / Cephalofair Games.",
     "creditsData": "Données d'avantages : Lurkars + contributeurs communautaires à Gloomhaven Secretariat.",
     "creditsApp": "Application : construite avec React Native + Expo.",
-    "creditsCompany": "Développé par 30str — 30str.com"
+    "creditsCompany": "Développé par 30str — 30str.com",
+    "advantage": "Avantage et désavantage",
+    "advantageSub": "Fonctionnement des modificateurs cumulatifs lors d'un tirage avec avantage ou désavantage.",
+    "advAuto": "Auto (selon le jeu)",
+    "advAutoSub": "Les classes Frosthaven suivent les règles Frosthaven ; les autres, celles de Gloomhaven.",
+    "advFh": "Frosthaven / Gloomhaven 2e éd.",
+    "advFhSub": "Tirez au-delà des cartes cumulatives, puis une de plus. Les cartes cumulatives s'ajoutent à la carte choisie ; le symbole de la seconde carte est ignoré.",
+    "advGh": "Gloomhaven 1re éd.",
+    "advGhSub": "Tirez deux cartes. Une carte cumulative s'ajoute à l'autre, donc pas de choix ; en désavantage, les cartes cumulatives sont ignorées.",
+    "rollingHouseRule": "Règle maison : continuer sur la seconde carte",
+    "rollingHouseRuleSub": "Avec les règles Frosthaven, une seconde carte cumulative fait tirer jusqu'à une carte non cumulative au lieu d'ignorer son symbole."
   },
   "games": {
     "gloomhaven": "Gloomhaven",
@@ -140,5 +153,9 @@
     "es": "Español",
     "it": "Italiano",
     "auto": "Automatique (langue du système)"
+  },
+  "update": {
+    "ready": "Mise à jour",
+    "readyA11y": "Mise à jour prête. Touchez pour redémarrer l'application et l'appliquer."
   }
 }

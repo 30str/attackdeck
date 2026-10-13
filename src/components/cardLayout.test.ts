@@ -8,6 +8,14 @@ function allCards(l: DrawLayout) {
   return [...l.stack, ...l.sequences.flat()];
 }
 
+function expectLeadInside(l: DrawLayout) {
+  for (const p of l.lead) {
+    expect(p.x).toBeGreaterThanOrEqual(-0.001);
+    expect(p.x + CARD_W * l.leadScale).toBeLessThanOrEqual(l.width + 0.001);
+    expect(p.y + CARD_H * l.leadScale).toBeLessThanOrEqual(l.top + 0.001);
+  }
+}
+
 function expectInsideBlock(l: DrawLayout, availW: number, availH: number) {
   const w = CARD_W * l.scale;
   const h = CARD_H * l.scale;
@@ -95,5 +103,25 @@ describe("layoutDraw", () => {
       expect(anchor.y - l.stack[i]!.y).toBeCloseTo(anchor.x - l.stack[i]!.x);
     }
     expectInsideBlock(l, PHONE.w, PHONE.h);
+  });
+
+  it("puts a smaller lead row under its label, above the options", () => {
+    const labelH = 18;
+    const l = layoutDraw([1, 1], 0, PHONE.w, PHONE.h, { count: 2, labelH });
+    expect(l.lead).toHaveLength(2);
+    expect(l.leadScale).toBeLessThan(l.scale);
+    expect(l.leadLabelY).toBe(0);
+    for (const p of l.lead) expect(p.y).toBeGreaterThanOrEqual(labelH - 0.001);
+    expectLeadInside(l);
+    expectInsideBlock(l, PHONE.w, PHONE.h);
+    expectNoFrontOverlap(l);
+    for (const p of l.sequences.flat()) expect(p.y).toBeGreaterThanOrEqual(l.top - 0.001);
+    expect(l.dividers).toHaveLength(1);
+  });
+
+  it("fits a long lead row and a single result on a short card area", () => {
+    const l = layoutDraw([1], 0, 312, 146, { count: 4, labelH: 18 });
+    expectLeadInside(l);
+    expectInsideBlock(l, 312, 146);
   });
 });

@@ -17,18 +17,20 @@ import * as Haptics from "expo-haptics";
 import { useTranslation } from "react-i18next";
 import { Image } from "expo-image";
 import { useParty } from "@/src/state/party";
-import { useSettings } from "@/src/state/settings";
+import { useSettings, resolveAdvantageRules } from "@/src/state/settings";
 import { Card } from "@/src/components/Card";
 import { Bounded, CONTENT_MAX_WIDTH } from "@/src/components/Bounded";
 import { DrawEffects, type EffectTier } from "@/src/components/DrawEffects";
 import { ClassIcon } from "@/src/components/ClassIcon";
 import { layoutDraw, CARD_W, CARD_H } from "@/src/components/cardLayout";
 import {
+  activeCards,
   countBless,
   countCurse,
   countTemp,
   canUndo,
   TEMP_CARD_VALUES,
+  type ActiveDraw,
   type TempCardValue,
 } from "@/src/engine/deck";
 import { findClass } from "@/src/data";
@@ -43,17 +45,20 @@ const DRAW_COOLDOWN_MS = 1000;
 // current card, offset diagonally up-left so each one's corner value peeks out.
 const STACK_MAX = 3;
 
-// Breathing room inside the card area, and the space the "pick the better
-// card" hint takes above an advantage pair.
+// Breathing room inside the card area; the hint lines above the cards ("pick
+// the better card", the miss note) and the gap below them; and the label band
+// over a lead row.
 const CARD_AREA_INSET = 16;
-const ADV_HINT_H = 30;
+const HINT_LINE_H = 16;
+const HINTS_GAP = 12;
+const LEAD_LABEL_H = 18;
 
 // Map the just-drawn cards to a reveal flourish. x2/bless celebrate; miss/curse
 // get the negative effect; perk-added "deck modifier" cards (id `perk-*`) and
 // scenario temp cards (id `temp-*`) get a subtle one. Plain base cards get
 // nothing.
-function tierForCards(sequences: CardData[][]): EffectTier | null {
-  const cards = sequences.flat();
+function tierForCards(active: ActiveDraw | null): EffectTier | null {
+  const cards = activeCards(active);
   if (cards.some((c) => c.value === "x2")) return "positive";
   if (cards.some((c) => c.value === "miss")) return "negative";
   if (cards.some((c) => c.id.startsWith("perk-") || c.id.startsWith("temp-"))) return "special";
@@ -77,6 +82,8 @@ export default function DrawScreen() {
   const addTempToCharacter = useParty((s) => s.addTempToCharacter);
   const removeTempFromCharacter = useParty((s) => s.removeTempFromCharacter);
   const hapticsEnabled = useSettings((s) => s.hapticsEnabled);
+  const advantageRules = useSettings((s) => s.advantageRules);
+  const rollingHouseRule = useSettings((s) => s.rollingHouseRule);
   const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<DrawMode>("normal");
@@ -114,7 +121,10 @@ export default function DrawScreen() {
   }
 
   const { deck } = character;
-  const sequences = deck.active;
+  const active = deck.active;
+  const options = active?.options ?? [];
+  const lead = active?.lead ?? [];
+  const klass = findClass(character.classId);
 
   const startCooldown = () => {
     setIsCoolingDown(true);
@@ -130,19 +140,14 @@ export default function DrawScreen() {
   const handleDraw = () => {
     if (isCoolingDown) return;
 
-    if (deck.needsShuffle) {
-      if (hapticsEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }
-      shuffleAll(character.id);
-      startCooldown();
-      return;
-    }
-
     if (mode === "normal") {
       drawCard(character.id);
     } else {
-      drawCardAdvantage(character.id);
+      drawCardAdvantage(character.id, {
+        kind: mode,
+        rules: resolveAdvantageRules(advantageRules, klass?.rulesVariant),
+        rollingHouseRule,
+      });
     }
 
     // Store updates synchronously, so read back the freshly drawn cards to
@@ -193,6 +198,17 @@ export default function DrawScreen() {
     shuffleDrawPile(character.id);
     setToast((prev) => ({ text: t("draw.shuffledUndrawn"), nonce: (prev?.nonce ?? 0) + 1 }));
   };
+  // The end-of-round reshuffle a revealed miss / x2 calls for. Drawing doesn't
+  // force it — a later attack in the same round still draws from what's left
+  // — so it gets its own button beside DRAW while pending. It shares the draw
+  // cooldown: DRAW widens into this button's spot once the shuffle clears,
+  // and a double-tap must not turn into an accidental draw.
+  const handleReshuffle = () => {
+    if (isCoolingDown) return;
+    if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    shuffleAll(character.id);
+    startCooldown();
+  };
   const handleShuffleAll = () => {
     if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     shuffleAll(character.id);
@@ -205,15 +221,33 @@ export default function DrawScreen() {
     setToast((prev) => ({ text: t("draw.deckReset"), nonce: (prev?.nonce ?? 0) + 1 }));
   };
 
-  const baseDrawLabel = mode === "normal" ? t("draw.drawBtn") : t("draw.drawTwice");
-  const drawLabel = deck.needsShuffle ? t("draw.shuffleBtn") : baseDrawLabel;
-  const showAdvHint = mode !== "normal" && sequences.length === 2;
-  const advLabel = mode === "advantage" ? t("draw.pickBetter") : t("draw.pickWorse");
+  const drawLabel = mode === "normal" ? t("draw.drawBtn") : t("draw.drawTwice");
+  // Hints follow the draw on screen, not the mode toggle, so switching modes
+  // after a draw doesn't relabel it.
+  const pickHint =
+    active && active.kind !== "normal" && options.length === 2
+      ? active.kind === "advantage"
+        ? t("draw.pickBetter")
+        : t("draw.pickWorse")
+      : null;
+  // Rolling into a MISS: no damage, but conditions/elements the rolling cards
+  // added still happen (official FAQ) — easy to forget at the table.
+  const added = (opt: CardData[]) =>
+    (active?.leadApplies ? lead : []).concat(
+      opt.filter((c) => c.rolling && !active?.rollingIgnored.includes(c.id)),
+    );
+  const missHint = options.some(
+    (opt) => opt.some((c) => c.value === "miss") && added(opt).some((c) => c.effects.length > 0),
+  )
+    ? t("draw.missEffects")
+    : null;
+  // The miss note may wrap to two lines on a phone; budget for both.
+  const hintLines = (pickHint ? 1 : 0) + (missHint ? 2 : 0);
+  const hintsH = hintLines > 0 ? HINTS_GAP + hintLines * HINT_LINE_H : 0;
   const blessCount = countBless(deck);
   const curseCount = countCurse(deck);
   const tempTotal = countTemp(deck);
   const undoable = canUndo(deck);
-  const klass = findClass(character.classId);
   const portrait = CLASS_PORTRAITS[character.classId];
 
   // The engine's recentDraws log is every card revealed by a draw, oldest
@@ -222,10 +256,12 @@ export default function DrawScreen() {
   // front display), the tail of the log is the stack. Undo rewinds the log
   // and a full shuffle clears it, so the display can't go stale. A card can
   // appear in the log twice (the pile ran dry and reshuffled mid-round), so
-  // keep only its latest reveal — ids double as React keys.
-  const seenIds = new Set(sequences.flat().map((c) => c.id));
+  // keep only its latest reveal — ids double as React keys. A draw with a
+  // lead row already fills the area with context, so it skips the cascade.
+  const seenIds = new Set(activeCards(active).map((c) => c.id));
   const stackCards: CardData[] = [];
-  for (let i = deck.recentDraws.length - 1; i >= 0 && stackCards.length < STACK_MAX; i--) {
+  const stackMax = lead.length > 0 ? 0 : STACK_MAX;
+  for (let i = deck.recentDraws.length - 1; i >= 0 && stackCards.length < stackMax; i--) {
     const c = deck.recentDraws[i]!;
     if (seenIds.has(c.id)) continue;
     seenIds.add(c.id);
@@ -239,12 +275,13 @@ export default function DrawScreen() {
   // draw is never invisible.
   const area = cardArea.w && cardArea.h ? cardArea : { w: CARD_W + CARD_AREA_INSET, h: CARD_H + CARD_AREA_INSET };
   const layout =
-    sequences.length > 0
+    options.length > 0
       ? layoutDraw(
-          sequences.map((seq) => seq.length),
+          options.map((seq) => seq.length),
           stackCards.length,
           area.w - CARD_AREA_INSET,
-          area.h - CARD_AREA_INSET - (showAdvHint ? ADV_HINT_H : 0),
+          area.h - CARD_AREA_INSET - hintsH,
+          { count: lead.length, labelH: LEAD_LABEL_H },
         )
       : null;
 
@@ -287,12 +324,45 @@ export default function DrawScreen() {
             pointerEvents="none"
           />
         ) : null}
-        {sequences.length === 0 ? (
+        {!active || options.length === 0 ? (
           <Text style={styles.placeholder}>{t("draw.tapToDraw")}</Text>
         ) : layout ? (
           <>
-            {showAdvHint ? <Text style={styles.advHint}>{advLabel}</Text> : null}
+            {pickHint || missHint ? (
+              <View style={styles.hints}>
+                {pickHint ? (
+                  <Text style={styles.advHint} numberOfLines={1}>
+                    {pickHint}
+                  </Text>
+                ) : null}
+                {missHint ? (
+                  <Text style={styles.missHint} numberOfLines={2}>
+                    {missHint}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
             <View style={{ width: layout.width, height: layout.height }}>
+              {lead.length > 0 ? (
+                <Text
+                  style={[styles.leadLabel, { top: layout.leadLabelY, width: layout.width }]}
+                  numberOfLines={1}
+                >
+                  {active.leadApplies ? t("draw.leadApplies") : t("draw.leadIgnored")}
+                </Text>
+              ) : null}
+              {lead.map((c, i) => (
+                <View
+                  key={`lead-${c.id}`}
+                  style={[
+                    styles.placed,
+                    { left: layout.lead[i]!.x, top: layout.lead[i]!.y },
+                    !active.leadApplies && styles.ignored,
+                  ]}
+                >
+                  <Card card={c} scale={layout.leadScale} />
+                </View>
+              ))}
               {layout.dividers.map((x, i) => (
                 <View
                   key={`divider-${i}`}
@@ -321,7 +391,7 @@ export default function DrawScreen() {
                   <Card card={c} scale={layout.scale} showCorner animateReveal={false} />
                 </Animated.View>
               ))}
-              {sequences.map((seq, si) =>
+              {options.map((seq, si) =>
                 seq.map((c, ci) => (
                   <View
                     key={`front-${c.id}`}
@@ -330,7 +400,11 @@ export default function DrawScreen() {
                       { left: layout.sequences[si]![ci]!.x, top: layout.sequences[si]![ci]!.y },
                     ]}
                   >
-                    <Card card={c} scale={layout.scale} />
+                    <Card
+                      card={c}
+                      scale={layout.scale}
+                      rollingIgnored={active.rollingIgnored.includes(c.id)}
+                    />
                   </View>
                 )),
               )}
@@ -381,12 +455,25 @@ export default function DrawScreen() {
         </Pressable>
       </View>
 
-      <DrawButton
-        label={drawLabel}
-        onPress={handleDraw}
-        disabled={isCoolingDown}
-        fill={cooldownFill}
-      />
+      <View style={styles.drawRow}>
+        {deck.needsShuffle ? (
+          <Pressable
+            style={[styles.drawBtn, styles.reshuffleBtn]}
+            onPress={handleReshuffle}
+            disabled={isCoolingDown}
+          >
+            <Text style={styles.reshuffleTxt} numberOfLines={1}>
+              {t("draw.shuffleBtn")}
+            </Text>
+          </Pressable>
+        ) : null}
+        <DrawButton
+          label={drawLabel}
+          onPress={handleDraw}
+          disabled={isCoolingDown}
+          fill={cooldownFill}
+        />
+      </View>
       {toast ? (
         <Toast
           text={toast.text}
@@ -523,7 +610,9 @@ function DrawButton({
   return (
     <Pressable style={styles.drawBtn} onPress={onPress} disabled={disabled}>
       <Animated.View style={[styles.drawBtnFill, fillStyle]} />
-      <Text style={styles.drawTxt}>{label}</Text>
+      <Text style={styles.drawTxt} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -610,7 +699,26 @@ const styles = StyleSheet.create({
   placeholder: { color: "#444", fontSize: 16 },
   placed: { position: "absolute" },
   divider: { position: "absolute", width: 1, backgroundColor: "#cbb26a", opacity: 0.35 },
-  advHint: { color: "#cbb26a", fontSize: 12, letterSpacing: 1.5, marginBottom: 12 },
+  hints: { alignItems: "center", marginBottom: HINTS_GAP },
+  advHint: { color: "#cbb26a", fontSize: 12, letterSpacing: 1.5, lineHeight: HINT_LINE_H },
+  missHint: {
+    color: "#cc8888",
+    fontSize: 12,
+    letterSpacing: 0.5,
+    lineHeight: HINT_LINE_H,
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
+  leadLabel: {
+    position: "absolute",
+    left: 0,
+    height: LEAD_LABEL_H,
+    color: "#888",
+    fontSize: 11,
+    letterSpacing: 1,
+    textAlign: "center",
+  },
+  ignored: { opacity: 0.4 },
   actions: { flexDirection: "row", gap: 8, marginBottom: 8 },
   blessTxt: { color: "#cbb26a", fontWeight: "700" },
   curseTxt: { color: "#cc8888", fontWeight: "700" },
@@ -703,7 +811,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   modalBtnTxt: { color: "#0a0a0a", fontWeight: "700" },
+  drawRow: { flexDirection: "row", gap: 8 },
   drawBtn: {
+    flex: 1,
     backgroundColor: "#4a3f27",
     paddingVertical: 28,
     borderRadius: 16,
@@ -721,6 +831,8 @@ const styles = StyleSheet.create({
     transformOrigin: "left",
   },
   drawTxt: { color: "#0a0a0a", fontWeight: "800", fontSize: 22, letterSpacing: 2 },
+  reshuffleBtn: { backgroundColor: "#1a1709", borderWidth: 2, borderColor: "#cbb26a" },
+  reshuffleTxt: { color: "#cbb26a", fontWeight: "800", fontSize: 18, letterSpacing: 1.5 },
   toast: {
     position: "absolute",
     alignSelf: "center",

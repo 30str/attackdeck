@@ -2,6 +2,12 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { createDebouncedStorage } from "./storage";
 import type { SupportedLocale } from "../i18n";
+import type { AdvantageRules } from "../engine/deck";
+import type { RulesVariant } from "../data/types";
+
+/** "auto" follows each class's game: Frosthaven classes use the Frosthaven
+ * (and Gloomhaven 2nd edition) procedure, everything else the original one. */
+export type AdvantageRulesSetting = "auto" | AdvantageRules;
 
 type SettingsState = {
   hapticsEnabled: boolean;
@@ -14,6 +20,11 @@ type SettingsState = {
   /** null means follow device locale */
   languageOverride: SupportedLocale | null;
   setLanguage: (locale: SupportedLocale | null) => void;
+  advantageRules: AdvantageRulesSetting;
+  setAdvantageRules: (v: AdvantageRulesSetting) => void;
+  /** Frosthaven rules only — see AdvantageOptions.rollingHouseRule. */
+  rollingHouseRule: boolean;
+  setRollingHouseRule: (v: boolean) => void;
 };
 
 export const useSettings = create<SettingsState>()(
@@ -33,6 +44,10 @@ export const useSettings = create<SettingsState>()(
       unlockAll: (ids) => set({ unlockedClasses: ids }),
       languageOverride: null,
       setLanguage: (locale) => set({ languageOverride: locale }),
+      advantageRules: "auto",
+      setAdvantageRules: (v) => set({ advantageRules: v }),
+      rollingHouseRule: false,
+      setRollingHouseRule: (v) => set({ rollingHouseRule: v }),
     }),
     {
       name: "settings",
@@ -43,4 +58,12 @@ export const useSettings = create<SettingsState>()(
 
 export function isUnlocked(state: SettingsState, classId: string): boolean {
   return state.unlockedClasses.includes(classId);
+}
+
+export function resolveAdvantageRules(
+  setting: AdvantageRulesSetting,
+  classVariant: RulesVariant | undefined
+): AdvantageRules {
+  if (setting !== "auto") return setting;
+  return classVariant === "fh" ? "fh" : "gh";
 }

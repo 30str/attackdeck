@@ -55,7 +55,10 @@
     "drawTwice": "ZIEHEN × 2",
     "tempCards": "Temp-Karten",
     "tempTitle": "Temporäre Karten",
-    "tempBody": "Szenario- und Gegenstandseffekte fügen deinem Stapel manchmal einfache Modifikatorkarten hinzu. Sie kommen wie normale Karten auf die Ablage und werden wieder eingemischt – sie bleiben im Stapel, bis du sie hier entfernst oder den Stapel zurücksetzt."
+    "tempBody": "Szenario- und Gegenstandseffekte fügen deinem Stapel manchmal einfache Modifikatorkarten hinzu. Sie kommen wie normale Karten auf die Ablage und werden wieder eingemischt – sie bleiben im Stapel, bis du sie hier entfernst oder den Stapel zurücksetzt.",
+    "leadApplies": "Zählt zur gewählten Karte",
+    "leadIgnored": "Ignoriert (Nachteil)",
+    "missEffects": "FEHLSCHLAG: kein Schaden, zusätzliche Effekte gelten trotzdem"
   },
   "settings": {
     "preferences": "Einstellungen",
@@ -82,7 +85,17 @@
     "creditsDesign": "Spieldesign: Isaac Childres / Cephalofair Games.",
     "creditsData": "Perk-Daten: Lurkars + Community-Beiträge zu Gloomhaven Secretariat.",
     "creditsApp": "App: gebaut mit React Native + Expo.",
-    "creditsCompany": "Entwickelt von 30str — 30str.com"
+    "creditsCompany": "Entwickelt von 30str — 30str.com",
+    "advantage": "Vorteil & Nachteil",
+    "advantageSub": "Wie fortlaufende Modifikatoren beim Ziehen mit Vorteil oder Nachteil funktionieren.",
+    "advAuto": "Automatisch (nach Spiel)",
+    "advAutoSub": "Frosthaven-Klassen nutzen die Frosthaven-Regeln, alle anderen die Gloomhaven-Regeln.",
+    "advFh": "Frosthaven / Gloomhaven 2. Ed.",
+    "advFhSub": "Über fortlaufende Karten hinaus ziehen, dann eine weitere. Fortlaufende Karten zählen zur gewählten Karte; das Symbol der zweiten Karte wird ignoriert.",
+    "advGh": "Gloomhaven 1. Ed.",
+    "advGhSub": "Zwei ziehen. Eine fortlaufende Karte zählt zur anderen, also keine Wahl; bei Nachteil werden fortlaufende Karten ignoriert.",
+    "rollingHouseRule": "Hausregel: zweite Karte weiterziehen",
+    "rollingHouseRuleSub": "Mit Frosthaven-Regeln zieht eine fortlaufende zweite Karte bis zu einer nicht fortlaufenden weiter, statt ihr Symbol zu ignorieren."
   },
   "games": {
     "gloomhaven": "Gloomhaven",
@@ -140,5 +153,9 @@
     "es": "Español",
     "it": "Italiano",
     "auto": "Automatisch (Gerätesprache)"
+  },
+  "update": {
+    "ready": "Update bereit",
+    "readyA11y": "Update bereit. Tippen, um die App neu zu starten und es zu installieren."
   }
 }

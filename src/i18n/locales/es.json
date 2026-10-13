@@ -55,7 +55,10 @@
     "drawTwice": "ROBAR × 2",
     "tempCards": "Cartas temp.",
     "tempTitle": "Cartas temporales",
-    "tempBody": "Los efectos de escenario u objeto a veces añaden cartas de modificador básicas a tu mazo. Van al descarte y se barajan de nuevo como cartas normales, y permanecen en el mazo hasta que las quites aquí o reinicies el mazo."
+    "tempBody": "Los efectos de escenario u objeto a veces añaden cartas de modificador básicas a tu mazo. Van al descarte y se barajan de nuevo como cartas normales, y permanecen en el mazo hasta que las quites aquí o reinicies el mazo.",
+    "leadApplies": "Se suman a la carta que elijas",
+    "leadIgnored": "Ignoradas (desventaja)",
+    "missEffects": "FALLO: sin daño, pero los efectos añadidos se aplican"
   },
   "settings": {
     "preferences": "Preferencias",
@@ -82,7 +85,17 @@
     "creditsDesign": "Diseño del juego: Isaac Childres / Cephalofair Games.",
     "creditsData": "Datos de mejoras: Lurkars + colaboradores de la comunidad en Gloomhaven Secretariat.",
     "creditsApp": "Aplicación: construida con React Native + Expo.",
-    "creditsCompany": "Desarrollado por 30str — 30str.com"
+    "creditsCompany": "Desarrollado por 30str — 30str.com",
+    "advantage": "Ventaja y desventaja",
+    "advantageSub": "Cómo funcionan los modificadores encadenados al robar con ventaja o desventaja.",
+    "advAuto": "Automático (según el juego)",
+    "advAutoSub": "Las clases de Frosthaven usan sus reglas; el resto, las de Gloomhaven.",
+    "advFh": "Frosthaven / Gloomhaven 2.ª ed.",
+    "advFhSub": "Roba más allá de las cartas encadenadas y luego una más. Las encadenadas se suman a la que elijas; se ignora el icono de la segunda carta.",
+    "advGh": "Gloomhaven 1.ª ed.",
+    "advGhSub": "Roba dos. Una carta encadenada se suma a la otra, así que no hay elección; con desventaja se ignoran las encadenadas.",
+    "rollingHouseRule": "Regla de la casa: seguir robando con la segunda carta",
+    "rollingHouseRuleSub": "Con las reglas de Frosthaven, una segunda carta encadenada sigue robando hasta una no encadenada en lugar de ignorar su icono."
   },
   "games": {
     "gloomhaven": "Gloomhaven",
@@ -140,5 +153,9 @@
     "es": "Español",
     "it": "Italiano",
     "auto": "Automático (idioma del dispositivo)"
+  },
+  "update": {
+    "ready": "Actualizar",
+    "readyA11y": "Actualización lista. Toca para reiniciar la app y aplicarla."
   }
 }

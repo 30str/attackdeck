@@ -14,12 +14,18 @@ const FLUSH_DELAY_MS = 400;
 type Pending = { value: StorageValue<unknown>; timer: ReturnType<typeof setTimeout> };
 const pending = new Map<string, Pending>();
 
-function flush(name: string) {
+function flush(name: string): Promise<void> {
   const entry = pending.get(name);
-  if (!entry) return;
+  if (!entry) return Promise.resolve();
   clearTimeout(entry.timer);
   pending.delete(name);
-  AsyncStorage.setItem(name, JSON.stringify(entry.value)).catch(() => {});
+  return AsyncStorage.setItem(name, JSON.stringify(entry.value)).catch(() => {});
+}
+
+/** Write every pending value now — before anything that tears down the JS
+ * runtime without backgrounding the app (an OTA reload). */
+export function flushAll(): Promise<void> {
+  return Promise.all(Array.from(pending.keys()).map(flush)).then(() => {});
 }
 
 // A backgrounded app can be killed by the OS at any time — flush immediately

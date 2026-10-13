@@ -56,7 +56,10 @@
     "drawTwice": "DRAW × 2",
     "tempCards": "Temp cards",
     "tempTitle": "Temporary cards",
-    "tempBody": "Scenario and item effects sometimes add plain modifier cards to your deck. They go to the discard and shuffle back in like normal cards, and stay in the deck until you remove them here or reset the deck."
+    "tempBody": "Scenario and item effects sometimes add plain modifier cards to your deck. They go to the discard and shuffle back in like normal cards, and stay in the deck until you remove them here or reset the deck.",
+    "leadApplies": "Added to whichever you pick",
+    "leadIgnored": "Ignored (disadvantage)",
+    "missEffects": "MISS: no damage, but added effects still apply"
   },
   "settings": {
     "preferences": "Preferences",
@@ -84,7 +87,17 @@
     "creditsData": "Perk data: Lurkars + community contributors to Gloomhaven Secretariat.",
     "creditsArt": "Class portraits: © Isaac Childres / Cephalofair Games, used under CC BY-NC-SA 4.0 via the Gloomhaven Creator Pack and Gloomhaven Secretariat.",
     "creditsApp": "App: built with React Native + Expo.",
-    "creditsCompany": "Developed by 30str — 30str.com"
+    "creditsCompany": "Developed by 30str — 30str.com",
+    "advantage": "Advantage & disadvantage",
+    "advantageSub": "How rolling modifiers work when you draw with advantage or disadvantage.",
+    "advAuto": "Auto (by game)",
+    "advAutoSub": "Frosthaven classes use Frosthaven rules; all others use Gloomhaven rules.",
+    "advFh": "Frosthaven / Gloomhaven 2nd ed.",
+    "advFhSub": "Draw past any rolling cards, then one more. Rolling cards add to whichever you pick; the second card's rolling icon is ignored.",
+    "advGh": "Gloomhaven 1st ed.",
+    "advGhSub": "Draw two. A rolling card adds to the other one, so there's no choice; with disadvantage rolling cards are ignored.",
+    "rollingHouseRule": "House rule: keep rolling on the second card",
+    "rollingHouseRuleSub": "With Frosthaven rules, a rolling second card draws on to a non-rolling one instead of having its rolling icon ignored."
   },
   "games": {
     "gloomhaven": "Gloomhaven",
@@ -142,5 +155,9 @@
     "es": "Español",
     "it": "Italiano",
     "auto": "Auto (device language)"
+  },
+  "update": {
+    "ready": "Update ready",
+    "readyA11y": "Update ready. Tap to restart the app and apply it."
   }
 }

@@ -2,17 +2,19 @@ import { useEffect } from "react";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { Link, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Dimensions, Pressable, Text } from "react-native";
+import { Dimensions, Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as ScreenOrientation from "expo-screen-orientation";
 import "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 import i18n, { detectDeviceLocale } from "@/src/i18n";
 import { useSettings } from "@/src/state/settings";
+import { UpdateChip, useUpdateRecheck } from "@/src/components/UpdateChip";
 
 export default function RootLayout() {
   const { t } = useTranslation();
   const languageOverride = useSettings((s) => s.languageOverride);
+  useUpdateRecheck();
 
   useEffect(() => {
     const target = languageOverride ?? detectDeviceLocale();
@@ -41,6 +43,7 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: "#0a0a0a" },
             headerTintColor: "#f5f5f5",
             contentStyle: { backgroundColor: "#0a0a0a" },
+            headerRight: () => <UpdateChip />,
           }}
         >
           <Stack.Screen
@@ -48,11 +51,14 @@ export default function RootLayout() {
             options={{
               title: t("nav.party"),
               headerRight: () => (
-                <Link href={"/settings" as never} asChild>
-                  <Pressable hitSlop={12} style={{ paddingHorizontal: 8 }}>
-                    <Text style={{ color: "#cbb26a", fontSize: 22 }}>⚙</Text>
-                  </Pressable>
-                </Link>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <UpdateChip />
+                  <Link href={"/settings" as never} asChild>
+                    <Pressable hitSlop={12} style={{ paddingHorizontal: 8 }}>
+                      <Text style={{ color: "#cbb26a", fontSize: 22 }}>⚙</Text>
+                    </Pressable>
+                  </Link>
+                </View>
               ),
             }}
           />

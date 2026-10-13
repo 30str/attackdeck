@@ -40,6 +40,9 @@ export type CardProps = {
   /** Skip the flip/glow reveal — stack cards already had their reveal when
    * they were drawn and must not re-flip on every re-render of the stack. */
   animateReveal?: boolean;
+  /** The rolling icon does not count for this draw (Frosthaven advantage's
+   * second card): the label is struck through. */
+  rollingIgnored?: boolean;
 };
 
 function formatValue(value: CardData["value"]): string {
@@ -57,7 +60,13 @@ function bgFor(card: CardData): string {
   return "#1a1a1a";
 }
 
-export function Card({ card, scale = 1, showCorner = false, animateReveal = true }: CardProps) {
+export function Card({
+  card,
+  scale = 1,
+  showCorner = false,
+  animateReveal = true,
+  rollingIgnored = false,
+}: CardProps) {
   const { t } = useTranslation();
   const s = scale;
   const label = formatValue(card.value);
@@ -117,6 +126,7 @@ export function Card({ card, scale = 1, showCorner = false, animateReveal = true
           style={[
             styles.rolling,
             { fontSize: Math.max(9, 12 * s), letterSpacing: s < 0.6 ? 1 : 2, marginBottom: 8 * s },
+            rollingIgnored && styles.rollingIgnored,
           ]}
           numberOfLines={1}
         >
@@ -162,6 +172,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rolling: { color: "#cbb26a" },
+  rollingIgnored: { color: "#666", textDecorationLine: "line-through" },
   corner: { position: "absolute", color: "#f5f5f5", fontWeight: "800" },
   value: {
     color: "#f5f5f5",
