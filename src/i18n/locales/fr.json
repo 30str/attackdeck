@@ -52,7 +52,6 @@
     "shuffleAll": "Tout mélanger",
     "drawBtn": "TIRER",
     "shuffleBtn": "MÉLANGER",
-    "drawTwice": "TIRER × 2",
     "tempCards": "Cartes temp.",
     "tempTitle": "Cartes temporaires",
     "tempBody": "Les effets de scénario ou d'objet ajoutent parfois des cartes de modificateur simples à ton paquet. Elles vont à la défausse et sont remélangées comme les cartes normales, et restent dans le paquet jusqu'à ce que tu les retires ici ou réinitialises le paquet.",
@@ -156,6 +155,7 @@
   },
   "update": {
     "ready": "Mise à jour",
-    "readyA11y": "Mise à jour prête. Touchez pour redémarrer l'application et l'appliquer."
+    "readyA11y": "Mise à jour prête. Touchez pour redémarrer l'application et l'appliquer.",
+    "applied": "Mis à jour en v{{version}} · {{date}}"
   }
 }

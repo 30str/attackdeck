@@ -52,7 +52,6 @@
     "shuffleAll": "Alles mischen",
     "drawBtn": "ZIEHEN",
     "shuffleBtn": "MISCHEN",
-    "drawTwice": "ZIEHEN × 2",
     "tempCards": "Temp-Karten",
     "tempTitle": "Temporäre Karten",
     "tempBody": "Szenario- und Gegenstandseffekte fügen deinem Stapel manchmal einfache Modifikatorkarten hinzu. Sie kommen wie normale Karten auf die Ablage und werden wieder eingemischt – sie bleiben im Stapel, bis du sie hier entfernst oder den Stapel zurücksetzt.",
@@ -156,6 +155,7 @@
   },
   "update": {
     "ready": "Update bereit",
-    "readyA11y": "Update bereit. Tippen, um die App neu zu starten und es zu installieren."
+    "readyA11y": "Update bereit. Tippen, um die App neu zu starten und es zu installieren.",
+    "applied": "Aktualisiert auf v{{version}} · {{date}}"
   }
 }

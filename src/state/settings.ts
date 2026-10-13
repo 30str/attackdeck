@@ -25,6 +25,9 @@ type SettingsState = {
   /** Frosthaven rules only — see AdvantageOptions.rollingHouseRule. */
   rollingHouseRule: boolean;
   setRollingHouseRule: (v: boolean) => void;
+  /** The last OTA update this device announced (the "updated" toast). */
+  lastSeenUpdateId: string | null;
+  setLastSeenUpdateId: (id: string) => void;
 };
 
 export const useSettings = create<SettingsState>()(
@@ -48,6 +51,8 @@ export const useSettings = create<SettingsState>()(
       setAdvantageRules: (v) => set({ advantageRules: v }),
       rollingHouseRule: false,
       setRollingHouseRule: (v) => set({ rollingHouseRule: v }),
+      lastSeenUpdateId: null,
+      setLastSeenUpdateId: (id) => set({ lastSeenUpdateId: id }),
     }),
     {
       name: "settings",

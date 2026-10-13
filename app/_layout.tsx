@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import i18n, { detectDeviceLocale } from "@/src/i18n";
 import { useSettings } from "@/src/state/settings";
 import { UpdateChip, useUpdateRecheck } from "@/src/components/UpdateChip";
+import { UpdateAppliedToast } from "@/src/components/UpdateAppliedToast";
 
 export default function RootLayout() {
   const { t } = useTranslation();
@@ -66,6 +67,7 @@ export default function RootLayout() {
           <Stack.Screen name="draw/[id]" options={{ title: t("nav.draw") }} />
           <Stack.Screen name="settings" options={{ title: t("nav.settings") }} />
         </Stack>
+        <UpdateAppliedToast />
         <StatusBar style="light" />
       </ThemeProvider>
     </GestureHandlerRootView>

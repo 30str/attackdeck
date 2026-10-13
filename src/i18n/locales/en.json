@@ -53,7 +53,6 @@
     "shuffleAll": "Shuffle all",
     "drawBtn": "DRAW",
     "shuffleBtn": "SHUFFLE",
-    "drawTwice": "DRAW × 2",
     "tempCards": "Temp cards",
     "tempTitle": "Temporary cards",
     "tempBody": "Scenario and item effects sometimes add plain modifier cards to your deck. They go to the discard and shuffle back in like normal cards, and stay in the deck until you remove them here or reset the deck.",
@@ -158,6 +157,7 @@
   },
   "update": {
     "ready": "Update ready",
-    "readyA11y": "Update ready. Tap to restart the app and apply it."
+    "readyA11y": "Update ready. Tap to restart the app and apply it.",
+    "applied": "Updated to v{{version}} · {{date}}"
   }
 }

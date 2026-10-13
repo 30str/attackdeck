@@ -52,7 +52,6 @@
     "shuffleAll": "Barajar todo",
     "drawBtn": "ROBAR",
     "shuffleBtn": "BARAJAR",
-    "drawTwice": "ROBAR × 2",
     "tempCards": "Cartas temp.",
     "tempTitle": "Cartas temporales",
     "tempBody": "Los efectos de escenario u objeto a veces añaden cartas de modificador básicas a tu mazo. Van al descarte y se barajan de nuevo como cartas normales, y permanecen en el mazo hasta que las quites aquí o reinicies el mazo.",
@@ -156,6 +155,7 @@
   },
   "update": {
     "ready": "Actualizar",
-    "readyA11y": "Actualización lista. Toca para reiniciar la app y aplicarla."
+    "readyA11y": "Actualización lista. Toca para reiniciar la app y aplicarla.",
+    "applied": "Actualizado a v{{version}} · {{date}}"
   }
 }

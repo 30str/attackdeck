@@ -52,7 +52,6 @@
     "shuffleAll": "Rimescola tutto",
     "drawBtn": "PESCA",
     "shuffleBtn": "RIMESCOLA",
-    "drawTwice": "PESCA × 2",
     "tempCards": "Carte temp.",
     "tempTitle": "Carte temporanee",
     "tempBody": "Gli effetti di scenario o degli oggetti a volte aggiungono carte modificatore semplici al tuo mazzo. Vanno negli scarti e vengono rimescolate come le carte normali, e restano nel mazzo finché non le rimuovi qui o reimposti il mazzo.",
@@ -156,6 +155,7 @@
   },
   "update": {
     "ready": "Aggiorna",
-    "readyA11y": "Aggiornamento pronto. Tocca per riavviare l'app e applicarlo."
+    "readyA11y": "Aggiornamento pronto. Tocca per riavviare l'app e applicarlo.",
+    "applied": "Aggiornato alla v{{version}} · {{date}}"
   }
 }

@@ -221,7 +221,10 @@ export default function DrawScreen() {
     setToast((prev) => ({ text: t("draw.deckReset"), nonce: (prev?.nonce ?? 0) + 1 }));
   };
 
-  const drawLabel = mode === "normal" ? t("draw.drawBtn") : t("draw.drawTwice");
+  // ▲ advantage / ▼ disadvantage: a reminder of the mode right on the button.
+  // The procedure may reveal more than two cards, so no "× 2".
+  const drawLabel =
+    mode === "normal" ? t("draw.drawBtn") : `${t("draw.drawBtn")} ${mode === "advantage" ? "▲" : "▼"}`;
   // Hints follow the draw on screen, not the mode toggle, so switching modes
   // after a draw doesn't relabel it.
   const pickHint =
